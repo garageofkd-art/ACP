@@ -47,6 +47,22 @@
       <div id="positions" class="text-sm text-slate-400">None</div>
     </section>
 
+    <!-- go-live readiness -->
+    <section class="rounded-xl bg-slate-900 p-3 border border-slate-800">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-sm font-semibold text-slate-300">Go-Live Readiness</h2>
+        <span id="readyVerdict" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-700">…</span>
+      </div>
+      <div class="flex items-end gap-3 mb-2">
+        <div>
+          <div class="text-xs text-slate-500">Edge confidence</div>
+          <div id="confidence" class="text-2xl font-bold">—</div>
+        </div>
+        <div class="text-xs text-slate-500 pb-1">target <span id="confTarget">95</span>% · the probability the edge is real, not luck</div>
+      </div>
+      <div id="readyChecks" class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs"></div>
+    </section>
+
     <!-- track record -->
     <section class="rounded-xl bg-slate-900 p-3">
       <h2 class="text-sm font-semibold text-slate-300 mb-2">Paper track record</h2>
@@ -106,6 +122,21 @@ function render(s) {
   if (s.last_tick) document.getElementById("lastTick").textContent = "last tick: " + new Date(s.last_tick).toLocaleTimeString();
 }
 
+const checkLabels = {
+  enough_trades: "Enough trades", net_positive: "Net positive",
+  profit_factor: "Profit factor ≥ target", edge_confidence: "Confidence ≥ target",
+  drawdown_within_limit: "Drawdown within limit",
+};
+async function refreshReadiness() {
+  const r = await (await fetch("/api/readiness")).json();
+  document.getElementById("confidence").textContent = r.edge_confidence_pct + "%";
+  document.getElementById("confTarget").textContent = r.targets.confidence_pct;
+  const v = document.getElementById("readyVerdict");
+  if (r.is_ready) { v.textContent = "🟢 READY"; v.className = "px-3 py-1 rounded-full text-xs font-bold bg-emerald-700"; }
+  else { v.textContent = "🔴 LOCKED"; v.className = "px-3 py-1 rounded-full text-xs font-bold bg-rose-700"; }
+  document.getElementById("readyChecks").innerHTML = Object.entries(r.checks).map(([k, ok]) =>
+    `<div class="flex items-center gap-1">${ok ? "✅" : "⛔"} <span class="text-slate-400">${checkLabels[k] || k}</span></div>`).join("");
+}
 async function refreshTrack() {
   const t = await (await fetch("/api/track-record")).json();
   document.getElementById("track").innerHTML = `
@@ -149,8 +180,8 @@ function connectWS() {
   ws.onclose = () => setTimeout(connectWS, 2000);
 }
 connectWS();
-refreshTrack(); refreshTrades(); refreshEcon();
-setInterval(() => { refreshTrack(); refreshTrades(); refreshEcon(); }, 5000);
+refreshReadiness(); refreshTrack(); refreshTrades(); refreshEcon();
+setInterval(() => { refreshReadiness(); refreshTrack(); refreshTrades(); refreshEcon(); }, 5000);
 </script>
 </body>
 </html>

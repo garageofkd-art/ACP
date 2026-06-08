@@ -87,5 +87,5 @@ def track_record() -> dict:
         "best_day": round(max(pnls), 2),
         "worst_day": round(min(pnls), 2),
         "max_drawdown": round(max_dd, 2),
-        "total_trades": sum(d["num_trades"] for d in days),
+        "total_trades": sum(d.get("num_trades", len(d.get("trades", []))) for d in days),
     }

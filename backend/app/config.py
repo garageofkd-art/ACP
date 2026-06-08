@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     # Assumed monthly infrastructure cost (VM etc.) for break-even tracking.
     monthly_infra_cost_inr: float = 500.0
 
+    # --- Go-live readiness gate (hard lock on real-money trading) ---
+    # Live trading is blocked until ALL of these pass (see app/readiness.py).
+    target_confidence_pct: float = 95.0       # statistical confidence the edge is real
+    min_trades_for_live: int = 30             # sample size before the stats mean anything
+    min_profit_factor: float = 1.3            # gross profit / gross loss
+    max_drawdown_pct_for_live: float = 15.0   # cap on peak-to-trough, % of capital
+    allow_live_override: bool = False         # emergency bypass of the lock (use with care)
+
     # --- Optional unattended TOTP auto-login (security-sensitive) ---
     upstox_mobile: str = ""
     upstox_pin: str = ""

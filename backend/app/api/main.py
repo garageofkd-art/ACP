@@ -21,6 +21,7 @@ from app.logging_config import setup_logging
 from app.data.instruments import UNIVERSE
 from app.economics import monthly_cost_report
 from app.journal import save_session_day, track_record
+from app.readiness import evaluate as evaluate_readiness
 from app.data.upstox_client import exchange_code_for_token, login_url, persist_token
 from app.strategies.orb import ORBStrategy
 from app.trading.runner import LiveRunner
@@ -119,6 +120,13 @@ def get_track_record() -> dict:
     """Accumulated paper/live track record across all journaled days —
     the go/no-go scoreboard for moving to (or staying) live."""
     return track_record()
+
+
+@app.get("/api/readiness")
+def readiness() -> dict:
+    """Go-live readiness: edge confidence + guardrails. Real money stays locked
+    until is_ready is true (or an explicit override is set)."""
+    return evaluate_readiness()
 
 
 @app.get("/api/economics")

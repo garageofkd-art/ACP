@@ -11,9 +11,15 @@ def test_factory_returns_paper_by_default():
     assert isinstance(get_broker(Settings(trading_mode="paper")), PaperBroker)
 
 
-def test_factory_returns_live_when_configured():
-    # Constructing the live broker must stay offline-safe (lazy key resolution).
-    assert isinstance(get_broker(Settings(trading_mode="live")), UpstoxBroker)
+def test_live_is_blocked_until_ready():
+    # Live requested but no track record yet -> readiness gate keeps us in paper.
+    assert isinstance(get_broker(Settings(trading_mode="live")), PaperBroker)
+
+
+def test_live_override_forces_live_broker():
+    # Explicit override bypasses the gate (offline-safe: lazy key resolution).
+    broker = get_broker(Settings(trading_mode="live", allow_live_override=True))
+    assert isinstance(broker, UpstoxBroker)
 
 
 def test_paper_fill_applies_slippage_and_cost():
