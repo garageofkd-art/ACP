@@ -36,3 +36,21 @@ def test_auth_login_returns_url():
     r = client.get("/api/auth/login")
     assert r.status_code == 200
     assert "url" in r.json()
+
+
+def test_dashboard_served():
+    r = client.get("/")
+    assert r.status_code == 200
+    assert "QuantifyWealth" in r.text
+
+
+def test_snapshot_exposes_status_fields():
+    snap = client.get("/api/snapshot").json()
+    for key in ("running", "authenticated", "needs_reauth", "last_error", "last_tick"):
+        assert key in snap
+
+
+def test_track_record_empty_shape():
+    tr = client.get("/api/track-record").json()
+    assert tr["days"] == 0
+    assert tr["net_pnl"] == 0.0

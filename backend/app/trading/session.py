@@ -14,6 +14,7 @@ by a strategy.
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, time
 
 from app.backtest.costs import CostConfig, apply_slippage
@@ -44,6 +45,7 @@ class TradingSession:
         self.risk = RiskManager(self.s)
         self.halted = False
         self._last_price: dict[str, float] = {}
+        self.log = logging.getLogger("quantifywealth.session")
 
     # --- main entry point ---------------------------------------------------
     def on_bar(self, bar: Bar) -> None:
@@ -72,6 +74,11 @@ class TradingSession:
             self.pf.open(
                 Position(bar.symbol, sig.side, fill.quantity, bar.ts, fill.price,
                          sig.stop, sig.target, fill.cost)
+            )
+            self.log.info(
+                "ENTRY %s %s x%d @ %.2f stop %.2f target %.2f (%s)",
+                sig.side.value, bar.symbol, fill.quantity, fill.price,
+                sig.stop, sig.target, sig.reason,
             )
 
     # --- position management ------------------------------------------------
@@ -108,8 +115,17 @@ class TradingSession:
         fill = self.broker.execute(symbol, exit_side, pos.qty, ref_price, ts, reason)
         trade = self.pf.close(symbol, ts, fill.price, fill.cost, reason)
         self.risk.record_close(ts.date(), trade.net_pnl)
-        if self.risk.kill_switch_tripped(ts.date()):
+        self.log.info(
+            "EXIT  %s x%d @ %.2f (%s) net ₹%.2f | day P&L ₹%.2f",
+            symbol, pos.qty, fill.price, reason, trade.net_pnl,
+            self.risk.daily_pnl(ts.date()),
+        )
+        if self.risk.kill_switch_tripped(ts.date()) and not self.halted:
             self.halted = True
+            self.log.warning(
+                "KILL SWITCH tripped — daily loss ₹%.2f breached cap. Flattening, no new entries today.",
+                self.risk.daily_pnl(ts.date()),
+            )
 
     def flatten_all(self, reason: str = "square_off", ts: datetime | None = None) -> None:
         """Force-close every open position at the last seen price. Called by the

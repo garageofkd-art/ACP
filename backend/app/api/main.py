@@ -9,12 +9,15 @@ from __future__ import annotations
 import asyncio
 import threading
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
+from app.logging_config import setup_logging
 from app.data.instruments import UNIVERSE
 from app.journal import save_session_day, track_record
 from app.data.upstox_client import exchange_code_for_token, login_url, persist_token
@@ -22,9 +25,13 @@ from app.strategies.orb import ORBStrategy
 from app.trading.runner import LiveRunner
 from app.trading.session import TradingSession
 
+STATIC_DIR = Path(__file__).parent / "static"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start the autonomous market-hours scheduler unless disabled (tests)."""
+    setup_logging()
     if get_settings().auto_schedule:
         try:
             from app.scheduler import MarketScheduler
@@ -46,6 +53,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.get("/", response_class=HTMLResponse)
+def dashboard() -> FileResponse:
+    """The self-contained monitoring dashboard (phone-friendly)."""
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 class _State:

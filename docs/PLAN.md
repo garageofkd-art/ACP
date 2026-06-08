@@ -20,13 +20,16 @@ NSE trading hours: 09:15–15:30 IST, Mon–Fri (markets closed weekends).
 
 | Dates | Milestone | Status |
 |---|---|---|
-| Jun 8–10 | Repo scaffold, Upstox OAuth, historical candle fetch, data layer | ☐ |
-| Jun 11–12 | Event-driven backtest engine + cost/slippage model | ☐ |
-| Jun 15–17 | ORB strategy + parameter optimizer/scanner; validate on history | ☐ |
-| Jun 18–19 | Live WebSocket feed, paper execution, risk engine + kill switch | ☐ |
-| Jun 22–24 | React dashboard wired up + forward paper run on live market | ☐ |
-| Jun 25 | Go live (flip to real money), monitored | ☐ |
-| Jun 26–28 | Buffer / monitoring / fixes | ☐ |
+| Jun 8–10 | Repo scaffold, Upstox OAuth, historical candle fetch, data layer | ✅ |
+| Jun 11–12 | Event-driven backtest engine + cost/slippage model | ✅ |
+| Jun 15–17 | ORB strategy + parameter optimizer/scanner; validate on history | ✅ (code; real-data run pending token) |
+| Jun 18–19 | Live WebSocket feed, paper execution, risk engine + kill switch | ✅ |
+| Jun 22–24 | Dashboard (served from API) + autonomy (scheduler/journal) + hardening | ✅ |
+| Ongoing | Forward paper testing on live market | ⏳ starts once Upstox token added |
+| Later | Go live (flip TRADING_MODE=live), monitored | ☐ after paper validation |
+
+Build is feature-complete. Only external dependency: the Upstox Developer App /
+daily token. See `docs/RUNBOOK.md`.
 
 ## Risk rules (defaults — tunable)
 
