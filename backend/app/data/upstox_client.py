@@ -54,6 +54,24 @@ def exchange_code_for_token(auth_code: str) -> dict:
     return resp.json()
 
 
+def persist_token(token: str) -> None:
+    """Write/replace UPSTOX_ACCESS_TOKEN in the repo-root .env and refresh
+    cached settings so the new token takes effect immediately."""
+    from app.config import REPO_ROOT, get_settings
+
+    path = REPO_ROOT / ".env"
+    lines = path.read_text().splitlines() if path.exists() else []
+    line = f"UPSTOX_ACCESS_TOKEN={token}"
+    for i, existing in enumerate(lines):
+        if existing.startswith("UPSTOX_ACCESS_TOKEN="):
+            lines[i] = line
+            break
+    else:
+        lines.append(line)
+    path.write_text("\n".join(lines) + "\n")
+    get_settings.cache_clear()
+
+
 def client() -> httpx.Client:
     """An authenticated httpx client for Upstox REST calls."""
     s = get_settings()
