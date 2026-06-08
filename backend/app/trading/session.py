@@ -14,7 +14,7 @@ by a strategy.
 """
 from __future__ import annotations
 
-from datetime import time
+from datetime import datetime, time
 
 from app.backtest.costs import CostConfig, apply_slippage
 from app.config import Settings, get_settings
@@ -80,7 +80,7 @@ class TradingSession:
 
         # Kill switch flattens everything, no questions asked.
         if self.halted:
-            self._close(bar.symbol, bar.close, bar, "kill_switch")
+            self._close(bar.symbol, bar.close, bar.ts, "kill_switch")
             return
 
         exit_price: float | None = None
@@ -100,16 +100,25 @@ class TradingSession:
             exit_price, reason = bar.close, "square_off"
 
         if exit_price is not None:
-            self._close(bar.symbol, exit_price, bar, reason)
+            self._close(bar.symbol, exit_price, bar.ts, reason)
 
-    def _close(self, symbol: str, ref_price: float, bar: Bar, reason: str) -> None:
+    def _close(self, symbol: str, ref_price: float, ts: datetime, reason: str) -> None:
         pos = self.pf.positions[symbol]
         exit_side = Side.SELL if pos.side == Side.BUY else Side.BUY
-        fill = self.broker.execute(symbol, exit_side, pos.qty, ref_price, bar.ts, reason)
-        trade = self.pf.close(symbol, bar.ts, fill.price, fill.cost, reason)
-        self.risk.record_close(bar.ts.date(), trade.net_pnl)
-        if self.risk.kill_switch_tripped(bar.ts.date()):
+        fill = self.broker.execute(symbol, exit_side, pos.qty, ref_price, ts, reason)
+        trade = self.pf.close(symbol, ts, fill.price, fill.cost, reason)
+        self.risk.record_close(ts.date(), trade.net_pnl)
+        if self.risk.kill_switch_tripped(ts.date()):
             self.halted = True
+
+    def flatten_all(self, reason: str = "square_off", ts: datetime | None = None) -> None:
+        """Force-close every open position at the last seen price. Called by the
+        scheduler at square-off so we never carry an intraday position past close,
+        even if the tick stream went quiet near the bell."""
+        ts = ts or datetime.now()
+        for symbol in list(self.pf.positions):
+            ref = self._last_price.get(symbol, self.pf.positions[symbol].entry_price)
+            self._close(symbol, ref, ts, reason)
 
     # --- state for the API / UI --------------------------------------------
     def snapshot(self) -> dict:

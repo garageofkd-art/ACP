@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     # --- Trading mode: backtest | paper | live ---
     trading_mode: str = "paper"
 
+    # Auto-run the market-hours scheduler when the API starts.
+    auto_schedule: bool = True
+
     # --- Capital & risk (INR) ---
     capital: float = 100_000
     risk_per_trade_pct: float = 1.0

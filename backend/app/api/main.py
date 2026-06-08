@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,12 +16,30 @@ from fastapi.responses import HTMLResponse
 
 from app.config import get_settings
 from app.data.instruments import UNIVERSE
+from app.journal import save_session_day, track_record
 from app.data.upstox_client import exchange_code_for_token, login_url, persist_token
 from app.strategies.orb import ORBStrategy
 from app.trading.runner import LiveRunner
 from app.trading.session import TradingSession
 
-app = FastAPI(title="QuantifyWealth")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start the autonomous market-hours scheduler unless disabled (tests)."""
+    if get_settings().auto_schedule:
+        try:
+            from app.scheduler import MarketScheduler
+
+            STATE.scheduler = MarketScheduler(STATE.runner, on_day_end=save_session_day)
+            STATE.scheduler.start()
+        except Exception:  # never let scheduler issues block the API
+            STATE.scheduler = None
+    yield
+    scheduler = getattr(STATE, "scheduler", None)
+    if scheduler is not None:
+        scheduler.shutdown()
+
+
+app = FastAPI(title="QuantifyWealth", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # dashboard runs locally; tighten for any deployment
@@ -78,6 +97,13 @@ def universe() -> list[dict]:
 @app.get("/api/snapshot")
 def snapshot() -> dict:
     return STATE.runner.snapshot()
+
+
+@app.get("/api/track-record")
+def get_track_record() -> dict:
+    """Accumulated paper/live track record across all journaled days —
+    the go/no-go scoreboard for moving to (or staying) live."""
+    return track_record()
 
 
 @app.get("/api/trades")
