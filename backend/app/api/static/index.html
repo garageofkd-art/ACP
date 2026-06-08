@@ -1,211 +1,189 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>QuantifyWealth</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root{--bg:#020617;--card:#0f172a;--card2:#1e293b;--line:#1e293b;--txt:#e2e8f0;--mut:#94a3b8;--mut2:#64748b;
+          --green:#10b981;--greenbg:#064e3b;--red:#f43f5e;--redbg:#7f1d1d;--amber:#f59e0b;--amberbg:#78350f;--indigo:#6366f1;}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+    .wrap{max-width:760px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:14px}
+    h1{font-size:24px;font-weight:700;margin:0}
+    h2{font-size:14px;font-weight:600;color:#cbd5e1;margin:0 0 8px}
+    .sub{font-size:11px;color:var(--mut)}
+    .hidden{display:none}
+    .row{display:flex;align-items:center;justify-content:space-between}
+    .controls{display:flex;flex-wrap:wrap;gap:8px}
+    .badge{padding:5px 12px;border-radius:999px;font-size:11px;font-weight:700;background:var(--card2)}
+    .badge.paper{background:#065f46}.badge.live{background:#9f1239}
+    .banner{border-radius:10px;padding:9px 14px;font-size:13px;font-weight:600;border:1px solid}
+    .banner.kill{background:rgba(127,29,29,.5);border-color:#dc2626}
+    .banner.target{background:rgba(6,78,59,.5);border-color:#059669}
+    .banner.auth{background:rgba(120,53,15,.5);border-color:#d97706}
+    .banner a{color:#fff;font-weight:700;cursor:pointer;text-decoration:underline}
+    .btn{padding:8px 14px;border:0;border-radius:10px;font-size:13px;font-weight:600;color:#fff;cursor:pointer}
+    .btn.indigo{background:var(--indigo)}.btn.green{background:#059669}.btn.red{background:#e11d48}.btn.slate{background:var(--card2)}
+    .state{padding:8px 12px;border-radius:10px;background:var(--card2);font-size:13px}
+    .card{background:var(--card);border-radius:12px;padding:14px}
+    .card.bordered{border:1px solid #334155}
+    .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;font-size:13px;color:var(--mut)}
+    .k{font-size:11px;color:var(--mut2)}
+    .big{font-size:18px;font-weight:700}
+    .huge{font-size:28px;font-weight:700}
+    .line-item{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:6px 0;font-size:13px}
+    .pnl-pos{color:var(--green)}.pnl-neg{color:var(--red)}
+    .barwrap{width:100%;background:var(--card2);border-radius:999px;height:8px;margin-top:4px}
+    .bar{height:8px;border-radius:999px;background:var(--green);transition:width .4s}
+    .bar.down{background:var(--red)}
+    .verdict{padding:5px 12px;border-radius:999px;font-size:11px;font-weight:700;background:var(--card2)}
+    .verdict.ready{background:#047857}.verdict.locked{background:#9f1239}
+    .checks{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:12px}
+    .foot{font-size:11px;color:#475569;text-align:center}
+    @media(max-width:520px){.cards{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:repeat(2,1fr)}}
+  </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen">
-  <div class="max-w-3xl mx-auto p-4 space-y-4">
+<body>
+  <div class="wrap">
 
-    <header class="flex items-center justify-between">
-      <div>
-        <h1 class="text-2xl font-bold">QuantifyWealth</h1>
-        <p class="text-xs text-slate-400" id="subtitle">Intraday ORB · NSE</p>
+    <div class="row">
+      <div><h1>QuantifyWealth</h1><div class="sub">Intraday ORB · NSE · Nifty 50 + MRF</div></div>
+      <span id="modeBadge" class="badge">…</span>
+    </div>
+
+    <div id="killBanner" class="banner kill hidden">⛔ Kill switch tripped — daily loss limit hit. No new entries today.</div>
+    <div id="targetBanner" class="banner target hidden">🎯 Daily target hit — profit banked, done for the day.</div>
+    <div id="authBanner" class="banner auth hidden">🔑 Upstox not connected / token expired. <a onclick="connectUpstox()">Connect Upstox</a></div>
+
+    <div class="controls">
+      <button class="btn indigo" onclick="connectUpstox()">Connect Upstox</button>
+      <button class="btn green" onclick="startSession()">Start</button>
+      <button class="btn red" onclick="stopSession()">Stop</button>
+      <button class="btn slate" onclick="testAlert()">Test alert</button>
+      <span id="runState" class="state">idle</span>
+    </div>
+
+    <div class="cards">
+      <div class="card"><div class="k">Equity</div><div id="equity" class="big">—</div></div>
+      <div class="card"><div class="k">Realized P&L</div><div id="realized" class="big">—</div></div>
+      <div class="card"><div class="k">Available</div><div id="available" class="big">—</div></div>
+      <div class="card"><div class="k">Trades today</div><div id="numTrades" class="big">—</div></div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="font-size:12px;color:var(--mut)"><span>Today's P&L vs target</span><span id="dailyLine">—</span></div>
+      <div class="barwrap"><div id="dailyBar" class="bar" style="width:0%"></div></div>
+    </div>
+
+    <div class="card"><h2>Open positions</h2><div id="positions" style="font-size:13px;color:var(--mut)">None</div></div>
+
+    <div class="card bordered">
+      <div class="row" style="margin-bottom:8px"><h2 style="margin:0">Go-Live Readiness</h2><span id="readyVerdict" class="verdict">…</span></div>
+      <div style="display:flex;align-items:flex-end;gap:12px;margin-bottom:10px">
+        <div><div class="k">Edge confidence</div><div id="confidence" class="huge">—</div></div>
+        <div class="k" style="padding-bottom:4px">target <span id="confTarget">95</span>% · the probability the edge is real, not luck</div>
       </div>
-      <span id="modeBadge" class="px-3 py-1 rounded-full text-xs font-semibold bg-slate-700">…</span>
-    </header>
-
-    <!-- alerts -->
-    <div id="killBanner" class="hidden rounded-lg bg-red-900/60 border border-red-600 px-4 py-2 text-sm font-semibold">
-      ⛔ Kill switch tripped — daily loss limit hit. No new entries today.
-    </div>
-    <div id="targetBanner" class="hidden rounded-lg bg-emerald-900/60 border border-emerald-600 px-4 py-2 text-sm font-semibold">
-      🎯 Daily target hit — profit banked, done for the day.
-    </div>
-    <div id="authBanner" class="hidden rounded-lg bg-amber-900/60 border border-amber-600 px-4 py-2 text-sm">
-      🔑 Upstox not connected / token expired. <button onclick="connectUpstox()" class="underline font-semibold">Connect Upstox</button>
+      <div id="readyChecks" class="checks"></div>
     </div>
 
-    <!-- controls -->
-    <div class="flex flex-wrap gap-2">
-      <button onclick="connectUpstox()" class="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold">Connect Upstox</button>
-      <button onclick="startSession()" class="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold">Start</button>
-      <button onclick="stopSession()" class="px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-sm font-semibold">Stop</button>
-      <button onclick="testAlert()" class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-semibold">Test alert</button>
-      <span id="runState" class="px-3 py-2 rounded-lg bg-slate-800 text-sm">idle</span>
-    </div>
+    <div class="card"><h2>Paper track record</h2><div id="track" class="grid">Loading…</div></div>
+    <div class="card"><h2>This month — cost &amp; break-even</h2><div id="econ" class="grid">Loading…</div><div id="econVerdict" style="margin-top:8px;font-size:13px;font-weight:600"></div></div>
+    <div class="card"><h2>Today's trades</h2><div id="trades" style="font-size:13px;color:var(--mut)">None yet</div></div>
 
-    <!-- P&L cards -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-      <div class="rounded-xl bg-slate-900 p-3"><div class="text-xs text-slate-400">Equity</div><div id="equity" class="text-lg font-bold">—</div></div>
-      <div class="rounded-xl bg-slate-900 p-3"><div class="text-xs text-slate-400">Realized P&L</div><div id="realized" class="text-lg font-bold">—</div></div>
-      <div class="rounded-xl bg-slate-900 p-3"><div class="text-xs text-slate-400">Available</div><div id="available" class="text-lg font-bold">—</div></div>
-      <div class="rounded-xl bg-slate-900 p-3"><div class="text-xs text-slate-400">Trades today</div><div id="numTrades" class="text-lg font-bold">—</div></div>
-    </div>
-    <div class="rounded-xl bg-slate-900 p-3">
-      <div class="flex justify-between text-xs text-slate-400 mb-1">
-        <span>Today's P&L vs target</span><span id="dailyLine">—</span>
-      </div>
-      <div class="w-full bg-slate-800 rounded-full h-2"><div id="dailyBar" class="bg-emerald-500 h-2 rounded-full" style="width:0%"></div></div>
-    </div>
-
-    <!-- open positions -->
-    <section class="rounded-xl bg-slate-900 p-3">
-      <h2 class="text-sm font-semibold text-slate-300 mb-2">Open positions</h2>
-      <div id="positions" class="text-sm text-slate-400">None</div>
-    </section>
-
-    <!-- go-live readiness -->
-    <section class="rounded-xl bg-slate-900 p-3 border border-slate-800">
-      <div class="flex items-center justify-between mb-2">
-        <h2 class="text-sm font-semibold text-slate-300">Go-Live Readiness</h2>
-        <span id="readyVerdict" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-700">…</span>
-      </div>
-      <div class="flex items-end gap-3 mb-2">
-        <div>
-          <div class="text-xs text-slate-500">Edge confidence</div>
-          <div id="confidence" class="text-2xl font-bold">—</div>
-        </div>
-        <div class="text-xs text-slate-500 pb-1">target <span id="confTarget">95</span>% · the probability the edge is real, not luck</div>
-      </div>
-      <div id="readyChecks" class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs"></div>
-    </section>
-
-    <!-- track record -->
-    <section class="rounded-xl bg-slate-900 p-3">
-      <h2 class="text-sm font-semibold text-slate-300 mb-2">Paper track record</h2>
-      <div id="track" class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm text-slate-400">Loading…</div>
-    </section>
-
-    <!-- cost / break-even -->
-    <section class="rounded-xl bg-slate-900 p-3">
-      <h2 class="text-sm font-semibold text-slate-300 mb-2">This month — cost & break-even</h2>
-      <div id="econ" class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm text-slate-400">Loading…</div>
-      <div id="econVerdict" class="mt-2 text-sm font-semibold"></div>
-    </section>
-
-    <!-- trade log -->
-    <section class="rounded-xl bg-slate-900 p-3">
-      <h2 class="text-sm font-semibold text-slate-300 mb-2">Today's trades</h2>
-      <div id="trades" class="text-sm text-slate-400">None yet</div>
-    </section>
-
-    <p class="text-[11px] text-slate-600 text-center pt-2" id="lastTick"></p>
+    <div class="foot" id="lastTick"></div>
   </div>
 
 <script>
 const fmt = (n) => (n === null || n === undefined) ? "—" : "₹" + Number(n).toLocaleString("en-IN", {maximumFractionDigits: 0});
-const pnlClass = (n) => n > 0 ? "text-emerald-400" : (n < 0 ? "text-rose-400" : "");
+const pnlClass = (n) => n > 0 ? "pnl-pos" : (n < 0 ? "pnl-neg" : "");
 
-async function connectUpstox() {
-  const r = await fetch("/api/auth/login"); const { url } = await r.json();
-  window.open(url, "_blank");
-}
-async function startSession() {
-  const r = await fetch("/api/session/start", { method: "POST" });
-  if (!r.ok) alert((await r.json()).detail || "Could not start");
-}
-async function stopSession() { await fetch("/api/session/stop", { method: "POST" }); }
-async function testAlert() {
-  const r = await (await fetch("/api/notify/test", { method: "POST" })).json();
-  alert(r.configured ? (r.sent ? "Test alert sent ✅" : "Configured but send failed — check logs.")
-                     : "No notification channel configured (set Telegram or SMTP in .env).");
-}
+async function connectUpstox(){ const {url} = await (await fetch("/api/auth/login")).json(); window.open(url, "_blank"); }
+async function startSession(){ const r = await fetch("/api/session/start",{method:"POST"}); if(!r.ok) alert((await r.json()).detail||"Could not start"); }
+async function stopSession(){ await fetch("/api/session/stop",{method:"POST"}); }
+async function testAlert(){ const r = await (await fetch("/api/notify/test",{method:"POST"})).json();
+  alert(r.configured ? (r.sent ? "Test alert sent ✅" : "Configured but send failed — check logs.") : "No notification channel configured (set Telegram or SMTP in .env)."); }
 
-function render(s) {
-  document.getElementById("modeBadge").textContent = (s.mode || "").toUpperCase();
-  document.getElementById("modeBadge").className =
-    "px-3 py-1 rounded-full text-xs font-semibold " + (s.mode === "live" ? "bg-rose-700" : "bg-emerald-700");
+function render(s){
+  const mb = document.getElementById("modeBadge");
+  mb.textContent = (s.mode||"").toUpperCase(); mb.className = "badge " + (s.mode==="live"?"live":"paper");
   document.getElementById("runState").textContent = s.running ? "running" : "idle";
   document.getElementById("equity").textContent = fmt(s.equity);
-  const r = document.getElementById("realized");
-  r.textContent = fmt(s.realized_pnl); r.className = "text-lg font-bold " + pnlClass(s.realized_pnl);
+  const r = document.getElementById("realized"); r.textContent = fmt(s.realized_pnl); r.className = "big " + pnlClass(s.realized_pnl);
   document.getElementById("available").textContent = fmt(s.available);
   document.getElementById("numTrades").textContent = s.num_trades ?? "—";
 
-  document.getElementById("killBanner").classList.toggle("hidden", !(s.halted && s.halt_reason === "kill_switch"));
-  document.getElementById("targetBanner").classList.toggle("hidden", !(s.halted && s.halt_reason === "profit_target"));
-  document.getElementById("authBanner").classList.toggle("hidden", !(s.needs_reauth || s.authenticated === false));
+  document.getElementById("killBanner").classList.toggle("hidden", !(s.halted && s.halt_reason==="kill_switch"));
+  document.getElementById("targetBanner").classList.toggle("hidden", !(s.halted && s.halt_reason==="profit_target"));
+  document.getElementById("authBanner").classList.toggle("hidden", !(s.needs_reauth || s.authenticated===false));
 
-  const target = s.daily_profit_target || 0;
-  const dp = s.daily_pnl || 0;
+  const target = s.daily_profit_target||0, dp = s.daily_pnl||0;
   document.getElementById("dailyLine").textContent = fmt(dp) + (target ? " / " + fmt(target) : "");
-  const pct = target > 0 ? Math.max(0, Math.min(100, (dp / target) * 100)) : 0;
   const bar = document.getElementById("dailyBar");
-  bar.style.width = pct + "%";
-  bar.className = (dp < 0 ? "bg-rose-500" : "bg-emerald-500") + " h-2 rounded-full";
+  bar.style.width = (target>0 ? Math.max(0,Math.min(100,(dp/target)*100)) : 0) + "%";
+  bar.className = "bar" + (dp<0 ? " down" : "");
 
-  const pos = s.open_positions || [];
-  document.getElementById("positions").innerHTML = pos.length === 0 ? "None" :
-    pos.map(p => `<div class="flex justify-between border-b border-slate-800 py-1">
-      <span>${p.side} <b>${p.symbol}</b> ×${p.qty} @ ${p.entry_price}</span>
-      <span class="${pnlClass(p.unrealized)}">${fmt(p.unrealized)}</span></div>`).join("");
+  const pos = s.open_positions||[];
+  document.getElementById("positions").innerHTML = pos.length===0 ? "None" :
+    pos.map(p=>`<div class="line-item"><span>${p.side} <b>${p.symbol}</b> ×${p.qty} @ ${p.entry_price}</span><span class="${pnlClass(p.unrealized)}">${fmt(p.unrealized)}</span></div>`).join("");
 
   if (s.last_tick) document.getElementById("lastTick").textContent = "last tick: " + new Date(s.last_tick).toLocaleTimeString();
 }
 
-const checkLabels = {
-  enough_trades: "Enough trades", net_positive: "Net positive",
-  profit_factor: "Profit factor ≥ target", edge_confidence: "Confidence ≥ target",
-  drawdown_within_limit: "Drawdown within limit",
-};
-async function refreshReadiness() {
+const checkLabels = {enough_trades:"Enough trades", net_positive:"Net positive", profit_factor:"Profit factor ≥ target",
+  edge_confidence:"Confidence ≥ target", drawdown_within_limit:"Drawdown within limit"};
+async function refreshReadiness(){
   const r = await (await fetch("/api/readiness")).json();
   document.getElementById("confidence").textContent = r.edge_confidence_pct + "%";
   document.getElementById("confTarget").textContent = r.targets.confidence_pct;
   const v = document.getElementById("readyVerdict");
-  if (r.is_ready) { v.textContent = "🟢 READY"; v.className = "px-3 py-1 rounded-full text-xs font-bold bg-emerald-700"; }
-  else { v.textContent = "🔴 LOCKED"; v.className = "px-3 py-1 rounded-full text-xs font-bold bg-rose-700"; }
-  document.getElementById("readyChecks").innerHTML = Object.entries(r.checks).map(([k, ok]) =>
-    `<div class="flex items-center gap-1">${ok ? "✅" : "⛔"} <span class="text-slate-400">${checkLabels[k] || k}</span></div>`).join("");
+  v.textContent = r.is_ready ? "🟢 READY" : "🔴 LOCKED"; v.className = "verdict " + (r.is_ready?"ready":"locked");
+  document.getElementById("readyChecks").innerHTML = Object.entries(r.checks).map(([k,ok])=>
+    `<div>${ok?"✅":"⛔"} <span style="color:var(--mut)">${checkLabels[k]||k}</span></div>`).join("");
 }
-async function refreshTrack() {
+async function refreshTrack(){
   const t = await (await fetch("/api/track-record")).json();
   document.getElementById("track").innerHTML = `
-    <div><div class="text-xs text-slate-500">Days</div>${t.days}</div>
-    <div><div class="text-xs text-slate-500">Net P&L</div><span class="${pnlClass(t.net_pnl)}">${fmt(t.net_pnl)}</span></div>
-    <div><div class="text-xs text-slate-500">Win days</div>${t.win_days}/${t.days} (${t.win_day_rate}%)</div>
-    <div><div class="text-xs text-slate-500">Max drawdown</div><span class="text-rose-400">${fmt(t.max_drawdown)}</span></div>
-    <div><div class="text-xs text-slate-500">Avg/day</div>${fmt(t.avg_daily_pnl)}</div>
-    <div><div class="text-xs text-slate-500">Best day</div><span class="text-emerald-400">${fmt(t.best_day)}</span></div>
-    <div><div class="text-xs text-slate-500">Worst day</div><span class="text-rose-400">${fmt(t.worst_day)}</span></div>
-    <div><div class="text-xs text-slate-500">Total trades</div>${t.total_trades}</div>`;
+    <div><div class="k">Days</div>${t.days}</div>
+    <div><div class="k">Net P&L</div><span class="${pnlClass(t.net_pnl)}">${fmt(t.net_pnl)}</span></div>
+    <div><div class="k">Win days</div>${t.win_days}/${t.days} (${t.win_day_rate}%)</div>
+    <div><div class="k">Max drawdown</div><span class="pnl-neg">${fmt(t.max_drawdown)}</span></div>
+    <div><div class="k">Avg/day</div>${fmt(t.avg_daily_pnl)}</div>
+    <div><div class="k">Best day</div><span class="pnl-pos">${fmt(t.best_day)}</span></div>
+    <div><div class="k">Worst day</div><span class="pnl-neg">${fmt(t.worst_day)}</span></div>
+    <div><div class="k">Total trades</div>${t.total_trades}</div>`;
 }
-async function refreshEcon() {
+async function refreshEcon(){
   const e = await (await fetch("/api/economics")).json();
   document.getElementById("econ").innerHTML = `
-    <div><div class="text-xs text-slate-500">Trades</div>${e.num_trades}</div>
-    <div><div class="text-xs text-slate-500">Trading costs</div><span class="text-rose-400">${fmt(e.trading_costs)}</span></div>
-    <div><div class="text-xs text-slate-500">Infra cost</div><span class="text-rose-400">${fmt(e.infra_cost)}</span></div>
-    <div><div class="text-xs text-slate-500">Break-even (gross)</div>${fmt(e.breakeven_gross)}</div>
-    <div><div class="text-xs text-slate-500">Gross P&L</div><span class="${pnlClass(e.gross_pnl)}">${fmt(e.gross_pnl)}</span></div>
-    <div><div class="text-xs text-slate-500">Net P&L</div><span class="${pnlClass(e.net_pnl)}">${fmt(e.net_pnl)}</span></div>
-    <div><div class="text-xs text-slate-500">After infra</div><span class="${pnlClass(e.profit_after_infra)}">${fmt(e.profit_after_infra)}</span></div>
-    <div><div class="text-xs text-slate-500">Avg cost/trade</div>${fmt(e.avg_cost_per_trade)}</div>`;
+    <div><div class="k">Trades</div>${e.num_trades}</div>
+    <div><div class="k">Trading costs</div><span class="pnl-neg">${fmt(e.trading_costs)}</span></div>
+    <div><div class="k">Infra cost</div><span class="pnl-neg">${fmt(e.infra_cost)}</span></div>
+    <div><div class="k">Break-even (gross)</div>${fmt(e.breakeven_gross)}</div>
+    <div><div class="k">Gross P&L</div><span class="${pnlClass(e.gross_pnl)}">${fmt(e.gross_pnl)}</span></div>
+    <div><div class="k">Net P&L</div><span class="${pnlClass(e.net_pnl)}">${fmt(e.net_pnl)}</span></div>
+    <div><div class="k">After infra</div><span class="${pnlClass(e.profit_after_infra)}">${fmt(e.profit_after_infra)}</span></div>
+    <div><div class="k">Avg cost/trade</div>${fmt(e.avg_cost_per_trade)}</div>`;
   const v = document.getElementById("econVerdict");
   v.textContent = e.covering_costs ? "✅ Covering all costs this month" : "⚠️ Not yet covering costs this month";
-  v.className = "mt-2 text-sm font-semibold " + (e.covering_costs ? "text-emerald-400" : "text-amber-400");
+  v.className = ""; v.style.color = e.covering_costs ? "var(--green)" : "var(--amber)";
 }
-async function refreshTrades() {
+async function refreshTrades(){
   const rows = await (await fetch("/api/trades")).json();
-  document.getElementById("trades").innerHTML = rows.length === 0 ? "None yet" :
-    rows.slice().reverse().map(t => `<div class="flex justify-between border-b border-slate-800 py-1">
-      <span>${t.side} <b>${t.symbol}</b> ×${t.qty} → ${t.reason}</span>
-      <span class="${pnlClass(t.net_pnl)}">${fmt(t.net_pnl)}</span></div>`).join("");
+  document.getElementById("trades").innerHTML = rows.length===0 ? "None yet" :
+    rows.slice().reverse().map(t=>`<div class="line-item"><span>${t.side} <b>${t.symbol}</b> ×${t.qty} → ${t.reason}</span><span class="${pnlClass(t.net_pnl)}">${fmt(t.net_pnl)}</span></div>`).join("");
 }
 
-// Live snapshot stream with auto-reconnect.
-function connectWS() {
-  const proto = location.protocol === "https:" ? "wss" : "ws";
+function connectWS(){
+  const proto = location.protocol==="https:"?"wss":"ws";
   const ws = new WebSocket(`${proto}://${location.host}/ws`);
-  ws.onmessage = (e) => { const s = JSON.parse(e.data); render(s); };
-  ws.onclose = () => setTimeout(connectWS, 2000);
+  ws.onmessage = (e)=>render(JSON.parse(e.data));
+  ws.onclose = ()=>setTimeout(connectWS, 2000);
 }
 connectWS();
 refreshReadiness(); refreshTrack(); refreshTrades(); refreshEcon();
-setInterval(() => { refreshReadiness(); refreshTrack(); refreshTrades(); refreshEcon(); }, 5000);
+setInterval(()=>{ refreshReadiness(); refreshTrack(); refreshTrades(); refreshEcon(); }, 5000);
 </script>
 </body>
 </html>
