@@ -41,11 +41,15 @@ class RiskManager:
     def daily_pnl(self, day: date) -> float:
         return self._daily_pnl.get(day, 0.0)
 
+    def kill_switch_tripped(self, day: date) -> bool:
+        """Daily loss limit breached -> flatten and stop trading for the day."""
+        return self.daily_pnl(day) <= -self.s.max_daily_loss_inr
+
     def can_enter(self, day: date, open_positions: int) -> bool:
         if open_positions >= self.s.max_concurrent_positions:
             return False
-        if self.daily_pnl(day) <= -self.s.max_daily_loss_inr:
-            return False  # kill switch tripped for the day
+        if self.kill_switch_tripped(day):
+            return False
         return True
 
     def record_close(self, day: date, net_pnl: float) -> None:
