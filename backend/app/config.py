@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     # --- Capital & risk (INR) ---
     capital: float = 100_000
     risk_per_trade_pct: float = 1.0
-    max_daily_loss_pct: float = 3.0
+    max_daily_loss_pct: float = 2.0
     max_concurrent_positions: int = 3
     square_off_time: str = "15:15"
 

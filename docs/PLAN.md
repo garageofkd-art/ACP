@@ -34,7 +34,7 @@ daily token. See `docs/RUNBOOK.md`.
 ## Risk rules (defaults — tunable)
 
 - **Per-trade risk:** ~1% of capital (₹1,000) — position size derived from stop distance.
-- **Max daily loss:** ~3% (₹3,000) → auto kill-switch, no new entries for the day.
+- **Max daily loss:** ~2% (₹2,000) → auto kill-switch, no new entries for the day. Symmetric with the daily profit target.
 - **Max concurrent positions:** 3.
 - **Mandatory square-off:** all positions closed by 15:15 IST.
 - **No averaging down.** One stop per position, hard.
