@@ -21,6 +21,9 @@
     <div id="killBanner" class="hidden rounded-lg bg-red-900/60 border border-red-600 px-4 py-2 text-sm font-semibold">
       ⛔ Kill switch tripped — daily loss limit hit. No new entries today.
     </div>
+    <div id="targetBanner" class="hidden rounded-lg bg-emerald-900/60 border border-emerald-600 px-4 py-2 text-sm font-semibold">
+      🎯 Daily target hit — profit banked, done for the day.
+    </div>
     <div id="authBanner" class="hidden rounded-lg bg-amber-900/60 border border-amber-600 px-4 py-2 text-sm">
       🔑 Upstox not connected / token expired. <button onclick="connectUpstox()" class="underline font-semibold">Connect Upstox</button>
     </div>
@@ -39,6 +42,12 @@
       <div class="rounded-xl bg-slate-900 p-3"><div class="text-xs text-slate-400">Realized P&L</div><div id="realized" class="text-lg font-bold">—</div></div>
       <div class="rounded-xl bg-slate-900 p-3"><div class="text-xs text-slate-400">Available</div><div id="available" class="text-lg font-bold">—</div></div>
       <div class="rounded-xl bg-slate-900 p-3"><div class="text-xs text-slate-400">Trades today</div><div id="numTrades" class="text-lg font-bold">—</div></div>
+    </div>
+    <div class="rounded-xl bg-slate-900 p-3">
+      <div class="flex justify-between text-xs text-slate-400 mb-1">
+        <span>Today's P&L vs target</span><span id="dailyLine">—</span>
+      </div>
+      <div class="w-full bg-slate-800 rounded-full h-2"><div id="dailyBar" class="bg-emerald-500 h-2 rounded-full" style="width:0%"></div></div>
     </div>
 
     <!-- open positions -->
@@ -110,8 +119,17 @@ function render(s) {
   document.getElementById("available").textContent = fmt(s.available);
   document.getElementById("numTrades").textContent = s.num_trades ?? "—";
 
-  document.getElementById("killBanner").classList.toggle("hidden", !s.halted);
+  document.getElementById("killBanner").classList.toggle("hidden", !(s.halted && s.halt_reason === "kill_switch"));
+  document.getElementById("targetBanner").classList.toggle("hidden", !(s.halted && s.halt_reason === "profit_target"));
   document.getElementById("authBanner").classList.toggle("hidden", !(s.needs_reauth || s.authenticated === false));
+
+  const target = s.daily_profit_target || 0;
+  const dp = s.daily_pnl || 0;
+  document.getElementById("dailyLine").textContent = fmt(dp) + (target ? " / " + fmt(target) : "");
+  const pct = target > 0 ? Math.max(0, Math.min(100, (dp / target) * 100)) : 0;
+  const bar = document.getElementById("dailyBar");
+  bar.style.width = pct + "%";
+  bar.className = (dp < 0 ? "bg-rose-500" : "bg-emerald-500") + " h-2 rounded-full";
 
   const pos = s.open_positions || [];
   document.getElementById("positions").innerHTML = pos.length === 0 ? "None" :

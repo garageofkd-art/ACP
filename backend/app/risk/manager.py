@@ -45,10 +45,21 @@ class RiskManager:
         """Daily loss limit breached -> flatten and stop trading for the day."""
         return self.daily_pnl(day) <= -self.s.max_daily_loss_inr
 
+    def profit_target_hit(self, day: date) -> bool:
+        """Daily profit target reached -> bank it and stop for the day."""
+        target = self.s.daily_profit_target_inr
+        return target > 0 and self.daily_pnl(day) >= target
+
+    def latest_day_pnl(self) -> float:
+        """P&L of the most recent day seen (for live status display)."""
+        if not self._daily_pnl:
+            return 0.0
+        return self._daily_pnl[max(self._daily_pnl)]
+
     def can_enter(self, day: date, open_positions: int) -> bool:
         if open_positions >= self.s.max_concurrent_positions:
             return False
-        if self.kill_switch_tripped(day):
+        if self.kill_switch_tripped(day) or self.profit_target_hit(day):
             return False
         return True
 

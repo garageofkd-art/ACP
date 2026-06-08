@@ -44,6 +44,7 @@ class TradingSession:
         self.pf = Portfolio(self.s.capital)
         self.risk = RiskManager(self.s)
         self.halted = False
+        self.halt_reason: str | None = None
         self._last_price: dict[str, float] = {}
         self.log = logging.getLogger("quantifywealth.session")
 
@@ -85,9 +86,9 @@ class TradingSession:
     def _manage(self, bar: Bar, t: time) -> None:
         pos = self.pf.positions[bar.symbol]
 
-        # Kill switch flattens everything, no questions asked.
+        # Halted (kill switch OR daily target) flattens everything.
         if self.halted:
-            self._close(bar.symbol, bar.close, bar.ts, "kill_switch")
+            self._close(bar.symbol, bar.close, bar.ts, self.halt_reason or "halted")
             return
 
         exit_price: float | None = None
@@ -120,10 +121,16 @@ class TradingSession:
             symbol, pos.qty, fill.price, reason, trade.net_pnl,
             self.risk.daily_pnl(ts.date()),
         )
-        if self.risk.kill_switch_tripped(ts.date()) and not self.halted:
-            self.halted = True
+        if not self.halted and self.risk.kill_switch_tripped(ts.date()):
+            self.halted, self.halt_reason = True, "kill_switch"
             self.log.warning(
                 "KILL SWITCH tripped — daily loss ₹%.2f breached cap. Flattening, no new entries today.",
+                self.risk.daily_pnl(ts.date()),
+            )
+        elif not self.halted and self.risk.profit_target_hit(ts.date()):
+            self.halted, self.halt_reason = True, "profit_target"
+            self.log.info(
+                "DAILY TARGET HIT — banked ₹%.2f. Flattening and done for the day. 🎯",
                 self.risk.daily_pnl(ts.date()),
             )
 
@@ -142,6 +149,9 @@ class TradingSession:
         return {
             "mode": self.broker.mode,
             "halted": self.halted,
+            "halt_reason": self.halt_reason,
+            "daily_pnl": round(self.risk.latest_day_pnl(), 2),
+            "daily_profit_target": self.s.daily_profit_target_inr,
             "equity": round(equity, 2),
             "realized_pnl": round(self.pf.realized_pnl, 2),
             "available": round(self.pf.available, 2),

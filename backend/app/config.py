@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     max_concurrent_positions: int = 3
     square_off_time: str = "15:15"
 
+    # Daily profit target (flat INR). On hitting it, flatten and stop for the
+    # day — "make the money and walk away". 0 disables it.
+    daily_profit_target_inr: float = 2000.0
+
     @property
     def is_live(self) -> bool:
         return self.trading_mode.lower() == "live"
