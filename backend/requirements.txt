@@ -1,5 +1,6 @@
 # Core
 upstox-python-sdk
+httpx
 fastapi
 uvicorn[standard]
 websockets
