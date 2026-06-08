@@ -16,6 +16,7 @@ from datetime import time
 import pandas as pd
 
 from app.backtest.costs import CostConfig, apply_slippage, charges
+from app.backtest.metrics import compute_metrics
 from app.config import Settings, get_settings
 from app.core.events import Bar, Side, SignalType
 from app.core.portfolio import Portfolio, Position, Trade
@@ -94,7 +95,7 @@ class BacktestEngine:
         self._flush(pf, risk, last_price, bars)
 
         eq = pd.DataFrame(equity_rows, columns=["ts", "equity"]).drop_duplicates("ts", keep="last")
-        return BacktestResult(pf.trades, eq, self._stats(pf.trades, eq))
+        return BacktestResult(pf.trades, eq, compute_metrics(pf.trades, eq, self.s.capital))
 
     # --- internals ----------------------------------------------------------
     @staticmethod
@@ -142,26 +143,3 @@ class BacktestEngine:
         last_ts = bars["ts"].iloc[-1]
         for sym in list(pf.positions):
             self._close(pf, risk, sym, last_ts, last_price[sym], "end_of_data")
-
-    @staticmethod
-    def _stats(trades: list[Trade], eq: pd.DataFrame) -> dict:
-        n = len(trades)
-        net = sum(t.net_pnl for t in trades)
-        gross = sum(t.gross_pnl for t in trades)
-        costs = sum(t.costs for t in trades)
-        wins = [t for t in trades if t.net_pnl > 0]
-        start = eq["equity"].iloc[0] if not eq.empty else 0.0
-        if eq.empty:
-            max_dd = 0.0
-        else:
-            roll_max = eq["equity"].cummax()
-            max_dd = float((eq["equity"] - roll_max).min())
-        return {
-            "num_trades": n,
-            "win_rate": (100.0 * len(wins) / n) if n else 0.0,
-            "gross_pnl": gross,
-            "net_pnl": net,
-            "total_costs": costs,
-            "max_drawdown": max_dd,
-            "return_pct": (100.0 * net / start) if start else 0.0,
-        }

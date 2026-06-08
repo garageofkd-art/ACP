@@ -68,6 +68,17 @@ def fetch_historical(
     return df
 
 
+def load_cached(instrument_key: str, interval: str = "1minute") -> pd.DataFrame:
+    """Load all cached candles for an instrument+interval, regardless of the
+    date ranges they were fetched in. Lets backtests run fully offline."""
+    safe_key = instrument_key.replace("|", "_")
+    files = sorted(CACHE_DIR.glob(f"{safe_key}__{interval}__*.parquet"))
+    if not files:
+        return pd.DataFrame(columns=_COLUMNS)
+    df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+    return df.drop_duplicates("ts").sort_values("ts").reset_index(drop=True)
+
+
 def fetch_intraday(instrument_key: str, interval: str = "1minute") -> pd.DataFrame:
     """Fetch *today's* candles so far (not cached — it's still forming)."""
     enc_key = quote(instrument_key, safe="")
