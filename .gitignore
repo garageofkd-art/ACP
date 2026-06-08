@@ -1,0 +1,32 @@
+# Secrets / config
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Data caches / runtime artifacts
+data/cache/
+*.sqlite
+*.db
+*.parquet
+logs/
+*.log
+
+# Frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

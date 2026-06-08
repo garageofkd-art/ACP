@@ -1,0 +1,18 @@
+# Core
+upstox-python-sdk
+fastapi
+uvicorn[standard]
+websockets
+apscheduler
+pydantic
+pydantic-settings
+python-dotenv
+
+# Data / analysis
+pandas
+numpy
+pyarrow
+
+# Dev
+pytest
+ruff
