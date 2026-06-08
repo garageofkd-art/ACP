@@ -122,6 +122,17 @@ def get_track_record() -> dict:
     return track_record()
 
 
+@app.post("/api/notify/test")
+def notify_test() -> dict:
+    """Send a test notification through whatever channels are configured."""
+    from app import notifications
+
+    return {
+        "configured": notifications.configured(),
+        "sent": notifications.send("✅ Test alert from QuantifyWealth — notifications are working."),
+    }
+
+
 @app.get("/api/readiness")
 def readiness() -> dict:
     """Go-live readiness: edge confidence + guardrails. Real money stays locked

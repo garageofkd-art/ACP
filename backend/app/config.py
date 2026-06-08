@@ -56,6 +56,28 @@ class Settings(BaseSettings):
     def auto_login_enabled(self) -> bool:
         return bool(self.upstox_mobile and self.upstox_pin and self.upstox_totp_secret)
 
+    # --- Notifications (optional) ---
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    notify_email_to: str = ""
+    notify_daily_summary: bool = True
+
+    @property
+    def telegram_configured(self) -> bool:
+        return bool(self.telegram_bot_token and self.telegram_chat_id)
+
+    @property
+    def email_configured(self) -> bool:
+        return bool(self.smtp_host and self.smtp_user and self.smtp_password and self.notify_email_to)
+
+    @property
+    def notifications_configured(self) -> bool:
+        return self.telegram_configured or self.email_configured
+
     # --- Capital & risk (INR) ---
     capital: float = 100_000
     risk_per_trade_pct: float = 1.0

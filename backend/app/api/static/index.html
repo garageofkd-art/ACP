@@ -33,6 +33,7 @@
       <button onclick="connectUpstox()" class="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold">Connect Upstox</button>
       <button onclick="startSession()" class="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold">Start</button>
       <button onclick="stopSession()" class="px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-sm font-semibold">Stop</button>
+      <button onclick="testAlert()" class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-semibold">Test alert</button>
       <span id="runState" class="px-3 py-2 rounded-lg bg-slate-800 text-sm">idle</span>
     </div>
 
@@ -107,6 +108,11 @@ async function startSession() {
   if (!r.ok) alert((await r.json()).detail || "Could not start");
 }
 async function stopSession() { await fetch("/api/session/stop", { method: "POST" }); }
+async function testAlert() {
+  const r = await (await fetch("/api/notify/test", { method: "POST" })).json();
+  alert(r.configured ? (r.sent ? "Test alert sent ✅" : "Configured but send failed — check logs.")
+                     : "No notification channel configured (set Telegram or SMTP in .env).");
+}
 
 function render(s) {
   document.getElementById("modeBadge").textContent = (s.mode || "").toUpperCase();

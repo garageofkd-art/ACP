@@ -72,3 +72,11 @@ class MarketScheduler:
         self.runner.stop()
         if self.on_day_end is not None:
             self.on_day_end(self.runner.session)
+        # After the day is journaled: daily summary + one-time READY alert.
+        from app import notifications
+
+        try:
+            notifications.send_daily_summary(self.runner.session)
+            notifications.notify_if_ready()
+        except Exception:  # noqa: BLE001
+            self.log.exception("End-of-day notification failed")
