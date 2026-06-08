@@ -1,0 +1,5 @@
+# OPTIONAL: only needed for unattended TOTP auto-login (app/auth/autologin.py).
+# After installing:  playwright install chromium
+# Security note: enabling auto-login means storing your Upstox mobile/PIN/TOTP
+# secret in .env. Only do this on a host you fully control. See the module docstring.
+playwright

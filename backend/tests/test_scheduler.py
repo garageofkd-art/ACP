@@ -2,12 +2,12 @@ from app.api.main import STATE
 from app.scheduler import MarketScheduler
 
 
-def test_scheduler_registers_three_daily_jobs():
+def test_scheduler_registers_daily_jobs():
     sched = MarketScheduler(STATE.runner)
     sched.start()
     try:
-        # start-day, square-off, end-day.
-        assert len(sched.sched.get_jobs()) == 3
+        # token refresh, start-day, square-off, end-day.
+        assert len(sched.sched.get_jobs()) == 4
     finally:
         sched.shutdown()
 

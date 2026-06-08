@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import get_settings
 from app.logging_config import setup_logging
 from app.data.instruments import UNIVERSE
+from app.economics import monthly_cost_report
 from app.journal import save_session_day, track_record
 from app.data.upstox_client import exchange_code_for_token, login_url, persist_token
 from app.strategies.orb import ORBStrategy
@@ -118,6 +119,12 @@ def get_track_record() -> dict:
     """Accumulated paper/live track record across all journaled days —
     the go/no-go scoreboard for moving to (or staying) live."""
     return track_record()
+
+
+@app.get("/api/economics")
+def economics(month: str | None = None) -> dict:
+    """Monthly cost & break-even scoreboard (gross P&L needed to cover costs)."""
+    return monthly_cost_report(month)
 
 
 @app.get("/api/trades")

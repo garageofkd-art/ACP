@@ -53,6 +53,13 @@
       <div id="track" class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm text-slate-400">Loading…</div>
     </section>
 
+    <!-- cost / break-even -->
+    <section class="rounded-xl bg-slate-900 p-3">
+      <h2 class="text-sm font-semibold text-slate-300 mb-2">This month — cost & break-even</h2>
+      <div id="econ" class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm text-slate-400">Loading…</div>
+      <div id="econVerdict" class="mt-2 text-sm font-semibold"></div>
+    </section>
+
     <!-- trade log -->
     <section class="rounded-xl bg-slate-900 p-3">
       <h2 class="text-sm font-semibold text-slate-300 mb-2">Today's trades</h2>
@@ -111,6 +118,21 @@ async function refreshTrack() {
     <div><div class="text-xs text-slate-500">Worst day</div><span class="text-rose-400">${fmt(t.worst_day)}</span></div>
     <div><div class="text-xs text-slate-500">Total trades</div>${t.total_trades}</div>`;
 }
+async function refreshEcon() {
+  const e = await (await fetch("/api/economics")).json();
+  document.getElementById("econ").innerHTML = `
+    <div><div class="text-xs text-slate-500">Trades</div>${e.num_trades}</div>
+    <div><div class="text-xs text-slate-500">Trading costs</div><span class="text-rose-400">${fmt(e.trading_costs)}</span></div>
+    <div><div class="text-xs text-slate-500">Infra cost</div><span class="text-rose-400">${fmt(e.infra_cost)}</span></div>
+    <div><div class="text-xs text-slate-500">Break-even (gross)</div>${fmt(e.breakeven_gross)}</div>
+    <div><div class="text-xs text-slate-500">Gross P&L</div><span class="${pnlClass(e.gross_pnl)}">${fmt(e.gross_pnl)}</span></div>
+    <div><div class="text-xs text-slate-500">Net P&L</div><span class="${pnlClass(e.net_pnl)}">${fmt(e.net_pnl)}</span></div>
+    <div><div class="text-xs text-slate-500">After infra</div><span class="${pnlClass(e.profit_after_infra)}">${fmt(e.profit_after_infra)}</span></div>
+    <div><div class="text-xs text-slate-500">Avg cost/trade</div>${fmt(e.avg_cost_per_trade)}</div>`;
+  const v = document.getElementById("econVerdict");
+  v.textContent = e.covering_costs ? "✅ Covering all costs this month" : "⚠️ Not yet covering costs this month";
+  v.className = "mt-2 text-sm font-semibold " + (e.covering_costs ? "text-emerald-400" : "text-amber-400");
+}
 async function refreshTrades() {
   const rows = await (await fetch("/api/trades")).json();
   document.getElementById("trades").innerHTML = rows.length === 0 ? "None yet" :
@@ -127,8 +149,8 @@ function connectWS() {
   ws.onclose = () => setTimeout(connectWS, 2000);
 }
 connectWS();
-refreshTrack(); refreshTrades();
-setInterval(() => { refreshTrack(); refreshTrades(); }, 5000);
+refreshTrack(); refreshTrades(); refreshEcon();
+setInterval(() => { refreshTrack(); refreshTrades(); refreshEcon(); }, 5000);
 </script>
 </body>
 </html>

@@ -36,6 +36,18 @@ class Settings(BaseSettings):
     # Auto-run the market-hours scheduler when the API starts.
     auto_schedule: bool = True
 
+    # Assumed monthly infrastructure cost (VM etc.) for break-even tracking.
+    monthly_infra_cost_inr: float = 500.0
+
+    # --- Optional unattended TOTP auto-login (security-sensitive) ---
+    upstox_mobile: str = ""
+    upstox_pin: str = ""
+    upstox_totp_secret: str = ""
+
+    @property
+    def auto_login_enabled(self) -> bool:
+        return bool(self.upstox_mobile and self.upstox_pin and self.upstox_totp_secret)
+
     # --- Capital & risk (INR) ---
     capital: float = 100_000
     risk_per_trade_pct: float = 1.0

@@ -25,6 +25,7 @@ def _trade_rows(session) -> list[dict]:
             "exit_ts": t.exit_ts.isoformat(),
             "exit_price": round(t.exit_price, 2),
             "net_pnl": round(t.net_pnl, 2),
+            "costs": round(t.costs, 2),
             "reason": t.reason,
         }
         for t in session.pf.trades

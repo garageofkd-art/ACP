@@ -5,6 +5,7 @@ fastapi
 uvicorn[standard]
 websockets
 apscheduler
+pyotp
 pydantic
 pydantic-settings
 python-dotenv
