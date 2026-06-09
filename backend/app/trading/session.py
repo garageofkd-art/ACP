@@ -19,7 +19,7 @@ from datetime import datetime, time
 
 from app.backtest.costs import CostConfig, apply_slippage
 from app.config import Settings, get_settings
-from app.core.events import Bar, Side, SignalType
+from app.core.events import Bar, Side, Signal, SignalType
 from app.core.portfolio import Portfolio, Position
 from app.execution.base import Broker
 from app.execution import get_broker
@@ -142,6 +142,31 @@ class TradingSession:
         for symbol in list(self.pf.positions):
             ref = self._last_price.get(symbol, self.pf.positions[symbol].entry_price)
             self._close(symbol, ref, ts, reason)
+
+    def place_test_trade(self, symbol: str | None = None) -> dict:
+        """Manual smoke-test: open ONE paper position at the live price to verify
+        the execution -> portfolio -> dashboard path. Paper mode only; never fires
+        a real order. Not a strategy signal — it just exercises the machinery."""
+        if self.broker.mode != "paper":
+            raise ValueError("Test trade is paper-only and disabled in live mode.")
+        if not self._last_price:
+            raise ValueError("No live price yet — start the session during market hours and wait ~1 min for ticks.")
+
+        symbol = symbol or next(iter(self._last_price))
+        price = self._last_price.get(symbol)
+        if not price:
+            raise ValueError(f"No live price for {symbol} yet.")
+        if symbol in self.pf.positions:
+            raise ValueError(f"Already holding {symbol}.")
+
+        now = datetime.now()
+        stop, target = round(price * 0.995, 2), round(price * 1.01, 2)
+        sig = Signal(symbol, now, SignalType.ENTRY, Side.BUY, price, stop, target, "manual_test")
+        qty = max(1, self.risk.size(sig, price, self.pf.available))
+        fill = self.broker.execute(symbol, Side.BUY, qty, price, now, "manual_test")
+        self.pf.open(Position(symbol, Side.BUY, fill.quantity, now, fill.price, stop, target, fill.cost))
+        self.log.info("MANUAL TEST trade: BUY %s x%d @ %.2f (paper)", symbol, fill.quantity, fill.price)
+        return {"symbol": symbol, "qty": fill.quantity, "price": fill.price, "stop": stop, "target": target}
 
     # --- state for the API / UI --------------------------------------------
     def snapshot(self) -> dict:

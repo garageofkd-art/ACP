@@ -183,6 +183,15 @@ def stop_session() -> dict:
     return {"running": False}
 
 
+@app.post("/api/session/test-trade")
+def test_trade(symbol: str | None = None) -> dict:
+    """Open one manual paper position at the live price (smoke test, paper only)."""
+    try:
+        return {"ok": True, "position": STATE.session.place_test_trade(symbol)}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
 # --- Upstox OAuth -----------------------------------------------------------
 @app.get("/api/auth/login")
 def auth_login() -> dict:
