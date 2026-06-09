@@ -41,10 +41,13 @@
     .verdict{padding:5px 12px;border-radius:999px;font-size:11px;font-weight:700;background:var(--card2)}
     .verdict.ready{background:#047857}.verdict.locked{background:#9f1239}
     .checks{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:12px}
-    .scroll{max-height:300px;overflow-y:auto}
-    .mkt{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 18px}
+    .scroll{max-height:320px;overflow-y:auto}
+    .mkt-table{width:100%;border-collapse:collapse;font-size:13px}
+    .mkt-table th{position:sticky;top:0;background:var(--card);text-align:right;color:var(--mut2);font-weight:600;padding:5px 6px;font-size:11px}
+    .mkt-table th:first-child{text-align:left}
+    .mkt-table td{padding:6px;border-bottom:1px solid var(--line)}
+    .mkt-table td.num{text-align:right;font-variant-numeric:tabular-nums}
     .foot{font-size:11px;color:#475569;text-align:center}
-    @media(max-width:520px){.mkt{grid-template-columns:1fr}}
     @media(max-width:520px){.cards{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:repeat(2,1fr)}}
   </style>
 </head>
@@ -82,8 +85,13 @@
     </div>
 
     <div class="card">
-      <div class="row" style="margin-bottom:8px"><h2 style="margin:0">Market — Nifty 50 + Index</h2><span id="mktCount" class="sub"></span></div>
-      <div id="market" class="scroll" style="font-size:13px;color:var(--mut)">Live prices appear when the session is running during market hours.</div>
+      <div class="row" style="margin-bottom:8px"><h2 style="margin:0">Market — Nifty 50 + Index</h2><span id="mktSrc" class="sub">…</span></div>
+      <div class="scroll">
+        <table class="mkt-table">
+          <thead><tr><th>Symbol</th><th>LTP</th><th>Chg</th><th>%Chg</th></tr></thead>
+          <tbody id="mktBody"><tr><td colspan="4" style="color:var(--mut)">Loading…</td></tr></tbody>
+        </table>
+      </div>
     </div>
 
     <div class="card"><h2>Open positions</h2><div id="positions" style="font-size:13px;color:var(--mut)">None</div></div>
@@ -146,14 +154,22 @@ function render(s){
     pos.map(p=>`<div class="line-item"><span>${p.side} <b>${p.symbol}</b> ×${p.qty} @ ${p.entry_price}</span><span class="${pnlClass(p.unrealized)}">${fmt(p.unrealized)}</span></div>`).join("");
 
   if (s.last_tick) document.getElementById("lastTick").textContent = "last tick: " + new Date(s.last_tick).toLocaleTimeString();
+}
 
-  const mkt = s.market || [];
-  document.getElementById("mktCount").textContent = mkt.length ? mkt.length + " live" : "";
-  if (mkt.length) {
-    document.getElementById("market").innerHTML = '<div class="mkt">' + mkt.map(m =>
-      `<div class="line-item"><span><b>${m.symbol}</b> <span style="color:var(--mut2)">${m.ltp}</span></span>` +
-      `<span class="${pnlClass(m.change)}">${m.change_pct >= 0 ? "+" : ""}${m.change_pct}%</span></div>`).join("") + '</div>';
-  }
+const num2 = (n) => Number(n).toLocaleString("en-IN", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+async function refreshMarket(){
+  const d = await (await fetch("/api/market")).json();
+  const src = document.getElementById("mktSrc");
+  src.textContent = d.source === "live" ? "● LIVE" : (d.source === "close" ? "as of last close" : (d.note || ""));
+  src.style.color = d.source === "live" ? "var(--green)" : "var(--mut)";
+  const rows = d.rows || [];
+  document.getElementById("mktBody").innerHTML = rows.length === 0
+    ? `<tr><td colspan="4" style="color:var(--mut)">${d.note || "No data"}</td></tr>`
+    : rows.map(m => `<tr>
+        <td><b>${m.symbol}</b></td>
+        <td class="num">${num2(m.ltp)}</td>
+        <td class="num ${pnlClass(m.change)}">${m.change >= 0 ? "+" : ""}${num2(m.change)}</td>
+        <td class="num ${pnlClass(m.change)}">${m.change_pct >= 0 ? "+" : ""}${m.change_pct}%</td></tr>`).join("");
 }
 
 const checkLabels = {enough_trades:"Enough trades", net_positive:"Net positive", profit_factor:"Profit factor ≥ target",
@@ -216,8 +232,8 @@ function connectWS(){
   ws.onclose = ()=>setTimeout(connectWS, 2000);
 }
 connectWS();
-refreshReadiness(); refreshCapital(); refreshTrack(); refreshTrades(); refreshEcon();
-setInterval(()=>{ refreshReadiness(); refreshCapital(); refreshTrack(); refreshTrades(); refreshEcon(); }, 5000);
+refreshMarket(); refreshReadiness(); refreshCapital(); refreshTrack(); refreshTrades(); refreshEcon();
+setInterval(()=>{ refreshMarket(); refreshReadiness(); refreshCapital(); refreshTrack(); refreshTrades(); refreshEcon(); }, 5000);
 </script>
 </body>
 </html>

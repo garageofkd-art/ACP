@@ -128,6 +128,21 @@ def snapshot() -> dict:
     return STATE.runner.snapshot()
 
 
+@app.get("/api/market")
+def market() -> dict:
+    """Watchlist: live tick prices when running, else last-close from Upstox."""
+    if STATE.runner.running and STATE.runner.prices:
+        return {"source": "live", "rows": STATE.runner.market_rows()}
+    if not get_settings().upstox_access_token:
+        return {"source": "none", "rows": [], "note": "Connect Upstox to load last-close prices."}
+    try:
+        from app import market as mkt
+
+        return {"source": "close", "rows": mkt.fetch_quotes()}
+    except Exception as exc:  # noqa: BLE001
+        return {"source": "error", "rows": [], "note": f"{type(exc).__name__}: {exc}"}
+
+
 @app.get("/api/track-record")
 def get_track_record() -> dict:
     """Accumulated paper/live track record across all journaled days —

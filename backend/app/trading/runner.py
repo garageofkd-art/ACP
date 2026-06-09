@@ -91,7 +91,7 @@ class LiveRunner:
         self.last_tick_ts = tick.ts
         self.agg.on_tick(tick)
 
-    def _market(self) -> list[dict]:
+    def market_rows(self) -> list[dict]:
         rows = []
         for sym, ltp in self.prices.items():
             op = self.day_open.get(sym, ltp)
@@ -118,5 +118,5 @@ class LiveRunner:
         snap["needs_reauth"] = self.needs_reauth
         snap["last_error"] = self.last_error
         snap["last_tick"] = self.last_tick_ts.isoformat() if self.last_tick_ts else None
-        snap["market"] = self._market()
+        snap["market"] = self.market_rows()
         return snap
