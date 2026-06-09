@@ -19,6 +19,7 @@ from app.backtest.costs import CostConfig, apply_slippage, charges
 from app.backtest.metrics import compute_metrics
 from app.config import Settings, get_settings
 from app.core.events import Bar, Side, SignalType
+from app.data.instruments import INDEX_SYMBOL
 from app.core.portfolio import Portfolio, Position, Trade
 from app.risk.manager import RiskManager
 from app.strategies.base import Strategy
@@ -46,11 +47,13 @@ class BacktestEngine:
         settings: Settings | None = None,
         cost: CostConfig | None = None,
         square_off: time | None = None,
+        regime=None,
     ):
         self.strategy = strategy
         self.s = settings or get_settings()
         self.cost = cost or CostConfig()
         self.square_off = square_off or self.s.square_off
+        self.regime = regime
 
     def run(self, data: dict[str, pd.DataFrame]) -> BacktestResult:
         pf = Portfolio(self.s.capital)
@@ -62,6 +65,12 @@ class BacktestEngine:
         equity_rows: list[tuple] = []
 
         for row in bars.itertuples(index=False):
+            # The index feed only updates the regime; it is never traded.
+            if row.symbol == INDEX_SYMBOL:
+                if self.regime is not None:
+                    self.regime.update(row.close, row.ts.date())
+                continue
+
             bar = Bar(row.symbol, row.ts, row.open, row.high, row.low, row.close, int(row.volume))
             last_price[bar.symbol] = bar.close
             t = bar.ts.time()
@@ -106,7 +115,11 @@ class BacktestEngine:
             d["symbol"] = sym
             frames.append(d)
         merged = pd.concat(frames, ignore_index=True)
-        return merged.sort_values("ts", kind="stable").reset_index(drop=True)
+        # Process the index bar first within each timestamp so the regime is
+        # up to date before the stocks at that minute are evaluated.
+        merged["_ix"] = (merged["symbol"] != INDEX_SYMBOL).astype(int)
+        merged = merged.sort_values(["ts", "_ix"], kind="stable").reset_index(drop=True)
+        return merged.drop(columns="_ix")
 
     def _manage(self, pf: Portfolio, risk: RiskManager, bar: Bar, t: time) -> None:
         pos = pf.positions[bar.symbol]

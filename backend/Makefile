@@ -1,4 +1,4 @@
-.PHONY: install test run fetch backtest optimize
+.PHONY: install test run fetch backtest optimize validate
 
 install:
 	python -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
@@ -10,10 +10,14 @@ run:
 	uvicorn app.api.main:app --host 0.0.0.0 --port 8000
 
 fetch:
-	PYTHONPATH=. python -m scripts.fetch_history --days 60
+	PYTHONPATH=. python -m scripts.fetch_history --days 180
 
 backtest:
 	PYTHONPATH=. python -m scripts.backtest
 
 optimize:
 	PYTHONPATH=. python -m scripts.backtest --optimize
+
+validate:
+	PYTHONPATH=. python -m scripts.fetch_history --days 180
+	PYTHONPATH=. python -m scripts.validate
