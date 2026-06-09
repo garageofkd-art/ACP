@@ -42,12 +42,14 @@ class ORBStrategy(Strategy):
         min_range_pct: float = 0.0015,
         max_range_pct: float = 0.05,
         volume_mult: float = 1.0,
+        breakout_buffer_pct: float = 0.0005,
         regime: Callable[[], int] | None = None,
     ):
         self.n = opening_range_minutes
         self.target_r = target_r
         self.session_start = session_start
         self.latest_entry = latest_entry
+        self.breakout_buffer_pct = breakout_buffer_pct
         # Optional market-regime gate: returns +1/-1/0. Longs need >=0, shorts <=0.
         self.regime = regime
         # Filters: skip days whose opening range is too narrow (choppy/dead) or
@@ -103,7 +105,11 @@ class ORBStrategy(Strategy):
         # Market-regime gate: don't fight the broader market.
         direction = self.regime() if self.regime else 0
 
-        if bar.close > st.or_high:
+        # Require a decisive break beyond the range (buffer), not a marginal poke.
+        long_level = st.or_high * (1 + self.breakout_buffer_pct)
+        short_level = st.or_low * (1 - self.breakout_buffer_pct)
+
+        if bar.close > long_level:
             if not volume_ok or direction < 0:
                 return []
             stop = st.or_low
@@ -118,7 +124,7 @@ class ORBStrategy(Strategy):
                         reason="ORB long breakout",
                     )
                 ]
-        elif bar.close < st.or_low:
+        elif bar.close < short_level:
             if not volume_ok or direction > 0:
                 return []
             stop = st.or_high

@@ -78,6 +78,7 @@ class _State:
             min_range_pct=settings.orb_min_range_pct,
             max_range_pct=settings.orb_max_range_pct,
             volume_mult=settings.orb_volume_mult,
+            breakout_buffer_pct=settings.orb_breakout_buffer_pct,
             regime=(regime.direction if regime else None),
         )
         self.session = TradingSession(strategy, settings=settings, regime=regime)

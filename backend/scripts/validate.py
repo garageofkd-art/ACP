@@ -41,6 +41,7 @@ def _build():
         min_range_pct=s.orb_min_range_pct,
         max_range_pct=s.orb_max_range_pct,
         volume_mult=s.orb_volume_mult,
+        breakout_buffer_pct=s.orb_breakout_buffer_pct,
         regime=(regime.direction if regime else None),
     )
     return strat, regime
