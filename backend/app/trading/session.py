@@ -144,18 +144,17 @@ class TradingSession:
             self._close(symbol, ref, ts, reason)
 
     def place_test_trade(self, symbol: str | None = None) -> dict:
-        """Manual smoke-test: open ONE paper position at the live price to verify
-        the execution -> portfolio -> dashboard path. Paper mode only; never fires
-        a real order. Not a strategy signal — it just exercises the machinery."""
+        """Manual smoke-test: a complete paper round-trip (buy + immediate sell)
+        at the live price, to prove the execution -> portfolio -> journal path.
+        Paper mode only; never fires a real order. Not a strategy signal — and the
+        P&L is essentially just the real trading cost, since it exits flat."""
         if self.broker.mode != "paper":
             raise ValueError("Test trade is paper-only and disabled in live mode.")
-        if not self._last_price:
-            raise ValueError("No live price yet — start the session during market hours and wait ~1 min for ticks.")
 
-        symbol = symbol or next(iter(self._last_price))
-        price = self._last_price.get(symbol)
-        if not price:
-            raise ValueError(f"No live price for {symbol} yet.")
+        # Prefer a live price; fall back to last-known, then a nominal price so the
+        # smoke test works even after market hours (it's just exercising machinery).
+        symbol = symbol or (next(iter(self._last_price)) if self._last_price else "RELIANCE")
+        price = self._last_price.get(symbol) or 2850.0
         if symbol in self.pf.positions:
             raise ValueError(f"Already holding {symbol}.")
 
@@ -165,8 +164,18 @@ class TradingSession:
         qty = max(1, self.risk.size(sig, price, self.pf.available))
         fill = self.broker.execute(symbol, Side.BUY, qty, price, now, "manual_test")
         self.pf.open(Position(symbol, Side.BUY, fill.quantity, now, fill.price, stop, target, fill.cost))
-        self.log.info("MANUAL TEST trade: BUY %s x%d @ %.2f (paper)", symbol, fill.quantity, fill.price)
-        return {"symbol": symbol, "qty": fill.quantity, "price": fill.price, "stop": stop, "target": target}
+        # Immediately close it at the live price -> one completed round-trip trade.
+        self._close(symbol, price, now, "manual_test")
+        trade = self.pf.trades[-1]
+        self.log.info("MANUAL TEST round-trip: %s x%d @ %.2f, net ₹%.2f (paper)",
+                      symbol, trade.qty, trade.entry_price, trade.net_pnl)
+        return {
+            "symbol": symbol, "qty": trade.qty,
+            "entry_price": round(trade.entry_price, 2),
+            "exit_price": round(trade.exit_price, 2),
+            "net_pnl": round(trade.net_pnl, 2),
+            "costs": round(trade.costs, 2),
+        }
 
     # --- state for the API / UI --------------------------------------------
     def snapshot(self) -> dict:

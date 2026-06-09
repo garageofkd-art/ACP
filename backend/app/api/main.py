@@ -187,7 +187,7 @@ def stop_session() -> dict:
 def test_trade(symbol: str | None = None) -> dict:
     """Open one manual paper position at the live price (smoke test, paper only)."""
     try:
-        return {"ok": True, "position": STATE.session.place_test_trade(symbol)}
+        return {"ok": True, "trade": STATE.session.place_test_trade(symbol)}
     except ValueError as exc:
         raise HTTPException(400, str(exc))
 
