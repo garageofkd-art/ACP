@@ -89,6 +89,13 @@ class Settings(BaseSettings):
     # day — "make the money and walk away". 0 disables it.
     daily_profit_target_inr: float = 2000.0
 
+    # --- ORB strategy parameters (tunable without code changes) ---
+    orb_opening_range_minutes: int = 15
+    orb_target_r: float = 2.0
+    orb_min_range_pct: float = 0.0015   # skip days with too-narrow opening range
+    orb_max_range_pct: float = 0.05     # skip gap/news-distorted wide ranges (0 = off)
+    orb_volume_mult: float = 1.0        # breakout volume vs avg OR-bar volume (0 = off)
+
     @property
     def is_live(self) -> bool:
         return self.trading_mode.lower() == "live"

@@ -70,7 +70,14 @@ class _State:
 
     def reset(self) -> None:
         settings = get_settings()
-        self.session = TradingSession(ORBStrategy(), settings=settings)
+        strategy = ORBStrategy(
+            opening_range_minutes=settings.orb_opening_range_minutes,
+            target_r=settings.orb_target_r,
+            min_range_pct=settings.orb_min_range_pct,
+            max_range_pct=settings.orb_max_range_pct,
+            volume_mult=settings.orb_volume_mult,
+        )
+        self.session = TradingSession(strategy, settings=settings)
         self.runner = LiveRunner(self.session)
         self.thread: threading.Thread | None = None
 

@@ -24,6 +24,8 @@ class _SymbolState:
     day: date
     or_high: float = float("-inf")
     or_low: float = float("inf")
+    vol_sum: float = 0.0
+    bar_count: int = 0
     traded: bool = False
 
 
@@ -36,11 +38,20 @@ class ORBStrategy(Strategy):
         target_r: float = 2.0,
         session_start: time = time(9, 15),
         latest_entry: time = time(14, 30),
+        min_range_pct: float = 0.0015,
+        max_range_pct: float = 0.05,
+        volume_mult: float = 1.0,
     ):
         self.n = opening_range_minutes
         self.target_r = target_r
         self.session_start = session_start
         self.latest_entry = latest_entry
+        # Filters: skip days whose opening range is too narrow (choppy/dead) or
+        # too wide (gap/news distorted), and require volume confirmation on the
+        # breakout bar (vs the average bar volume during the opening range).
+        self.min_range_pct = min_range_pct
+        self.max_range_pct = max_range_pct
+        self.volume_mult = volume_mult
         self._state: dict[str, _SymbolState] = {}
 
     def reset(self) -> None:
@@ -65,13 +76,29 @@ class ORBStrategy(Strategy):
         if t < self._end_of_range():
             st.or_high = max(st.or_high, bar.high)
             st.or_low = min(st.or_low, bar.low)
+            st.vol_sum += bar.volume
+            st.bar_count += 1
             return []
 
         # Phase 2: look for a breakout.
         if st.traded or st.or_high == float("-inf") or t >= self.latest_entry:
             return []
 
+        # Range-width filters: skip dead/choppy or gap-distorted days.
+        range_pct = (st.or_high - st.or_low) / bar.close if bar.close else 0.0
+        if range_pct < self.min_range_pct:
+            return []
+        if self.max_range_pct and range_pct > self.max_range_pct:
+            return []
+
+        # Volume confirmation: breakout bar must trade at least volume_mult x the
+        # average opening-range bar volume (otherwise wait for a stronger bar).
+        avg_vol = (st.vol_sum / st.bar_count) if st.bar_count else 0.0
+        volume_ok = not (self.volume_mult and avg_vol) or bar.volume >= self.volume_mult * avg_vol
+
         if bar.close > st.or_high:
+            if not volume_ok:
+                return []
             stop = st.or_low
             risk = bar.close - stop
             if risk > 0:
@@ -85,6 +112,8 @@ class ORBStrategy(Strategy):
                     )
                 ]
         elif bar.close < st.or_low:
+            if not volume_ok:
+                return []
             stop = st.or_high
             risk = stop - bar.close
             if risk > 0:
