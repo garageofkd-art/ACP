@@ -21,6 +21,7 @@ from app.backtest.costs import CostConfig, apply_slippage
 from app.config import Settings, get_settings
 from app.core.events import Bar, Side, Signal, SignalType
 from app.core.portfolio import Portfolio, Position
+from app.data.instruments import INDEX_SYMBOL
 from app.execution.base import Broker
 from app.execution import get_broker
 from app.risk.manager import RiskManager
@@ -35,10 +36,12 @@ class TradingSession:
         settings: Settings | None = None,
         cost: CostConfig | None = None,
         square_off: time | None = None,
+        regime=None,
     ):
         self.s = settings or get_settings()
         self.cost = cost or CostConfig()
         self.strategy = strategy
+        self.regime = regime
         self.broker = broker or get_broker(self.s, self.cost)
         self.square_off = square_off or self.s.square_off
         self.pf = Portfolio(self.s.capital)
@@ -50,6 +53,11 @@ class TradingSession:
 
     # --- main entry point ---------------------------------------------------
     def on_bar(self, bar: Bar) -> None:
+        # The index feed only updates the regime; it is never traded.
+        if self.regime is not None and bar.symbol == INDEX_SYMBOL:
+            self.regime.update(bar.close, bar.ts.date())
+            return
+
         self._last_price[bar.symbol] = bar.close
         t = bar.ts.time()
         day = bar.ts.date()

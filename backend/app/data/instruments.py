@@ -93,6 +93,10 @@ UNIVERSE: list[Instrument] = [
 
 UNIVERSE_BY_SYMBOL: dict[str, Instrument] = {i.symbol: i for i in UNIVERSE}
 
+# Nifty 50 index — streamed for the market-regime filter, never traded.
+INDEX_SYMBOL = "NIFTY50"
+INDEX_INSTRUMENT_KEY = "NSE_INDEX|Nifty 50"
+
 
 def _load_master(force_refresh: bool = False) -> list[dict]:
     """Download (and cache) the Upstox instruments master."""

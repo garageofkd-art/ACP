@@ -41,13 +41,20 @@ class LiveRunner:
 
         keys = resolve_instrument_keys()
         key_to_symbol = {k: s for s, k in keys.items()}
+        feed_keys = list(keys.values())
+        # Also stream the index (data only) when the regime filter is in use.
+        if getattr(self.session, "regime", None) is not None:
+            from app.data.instruments import INDEX_INSTRUMENT_KEY, INDEX_SYMBOL
+
+            key_to_symbol[INDEX_INSTRUMENT_KEY] = INDEX_SYMBOL
+            feed_keys.append(INDEX_INSTRUMENT_KEY)
         self.running = True
         self.needs_reauth = False
         backoff = 2
 
         while self.running:
             try:
-                self._feed = UpstoxLiveFeed(list(keys.values()), key_to_symbol, self._on_tick)
+                self._feed = UpstoxLiveFeed(feed_keys, key_to_symbol, self._on_tick)
                 self.log.info("Connecting Upstox live feed for %d instruments…", len(keys))
                 self._feed.connect()  # blocks until disconnect/error
                 backoff = 2

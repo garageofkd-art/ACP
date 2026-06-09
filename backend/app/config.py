@@ -95,6 +95,7 @@ class Settings(BaseSettings):
     orb_min_range_pct: float = 0.0015   # skip days with too-narrow opening range
     orb_max_range_pct: float = 0.05     # skip gap/news-distorted wide ranges (0 = off)
     orb_volume_mult: float = 1.0        # breakout volume vs avg OR-bar volume (0 = off)
+    use_index_filter: bool = True       # only long when Nifty up / short when down
 
     @property
     def is_live(self) -> bool:

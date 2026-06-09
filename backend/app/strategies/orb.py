@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
+from typing import Callable
 
 from app.core.events import Bar, Side, Signal, SignalType
 from app.strategies.base import Strategy
@@ -41,11 +42,14 @@ class ORBStrategy(Strategy):
         min_range_pct: float = 0.0015,
         max_range_pct: float = 0.05,
         volume_mult: float = 1.0,
+        regime: Callable[[], int] | None = None,
     ):
         self.n = opening_range_minutes
         self.target_r = target_r
         self.session_start = session_start
         self.latest_entry = latest_entry
+        # Optional market-regime gate: returns +1/-1/0. Longs need >=0, shorts <=0.
+        self.regime = regime
         # Filters: skip days whose opening range is too narrow (choppy/dead) or
         # too wide (gap/news distorted), and require volume confirmation on the
         # breakout bar (vs the average bar volume during the opening range).
@@ -96,8 +100,11 @@ class ORBStrategy(Strategy):
         avg_vol = (st.vol_sum / st.bar_count) if st.bar_count else 0.0
         volume_ok = not (self.volume_mult and avg_vol) or bar.volume >= self.volume_mult * avg_vol
 
+        # Market-regime gate: don't fight the broader market.
+        direction = self.regime() if self.regime else 0
+
         if bar.close > st.or_high:
-            if not volume_ok:
+            if not volume_ok or direction < 0:
                 return []
             stop = st.or_low
             risk = bar.close - stop
@@ -112,7 +119,7 @@ class ORBStrategy(Strategy):
                     )
                 ]
         elif bar.close < st.or_low:
-            if not volume_ok:
+            if not volume_ok or direction > 0:
                 return []
             stop = st.or_high
             risk = stop - bar.close
