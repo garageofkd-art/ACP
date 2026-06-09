@@ -31,6 +31,9 @@ class LiveRunner:
         self.needs_reauth = False
         self.last_error: str | None = None
         self.last_tick_ts: datetime | None = None
+        self.prices: dict[str, float] = {}      # latest LTP per symbol (tick-rate)
+        self.day_open: dict[str, float] = {}     # first price seen today, per symbol
+        self._price_day = None
         self.log = logging.getLogger("quantifywealth.runner")
 
     def start(self) -> None:
@@ -79,8 +82,28 @@ class LiveRunner:
         self.log.info("Runner stopped.")
 
     def _on_tick(self, tick: Tick) -> None:
+        # Track live prices (tick-rate) for the market watchlist.
+        if tick.ts.date() != self._price_day:
+            self._price_day = tick.ts.date()
+            self.day_open = {}
+        self.day_open.setdefault(tick.symbol, tick.ltp)
+        self.prices[tick.symbol] = tick.ltp
         self.last_tick_ts = tick.ts
         self.agg.on_tick(tick)
+
+    def _market(self) -> list[dict]:
+        rows = []
+        for sym, ltp in self.prices.items():
+            op = self.day_open.get(sym, ltp)
+            chg = ltp - op
+            rows.append({
+                "symbol": sym,
+                "ltp": round(ltp, 2),
+                "change": round(chg, 2),
+                "change_pct": round((chg / op * 100) if op else 0.0, 2),
+            })
+        # Biggest movers first.
+        return sorted(rows, key=lambda r: r["change_pct"], reverse=True)
 
     def _safe_on_bar(self, bar: Bar) -> None:
         try:
@@ -95,4 +118,5 @@ class LiveRunner:
         snap["needs_reauth"] = self.needs_reauth
         snap["last_error"] = self.last_error
         snap["last_tick"] = self.last_tick_ts.isoformat() if self.last_tick_ts else None
+        snap["market"] = self._market()
         return snap

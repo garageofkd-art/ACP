@@ -41,7 +41,10 @@
     .verdict{padding:5px 12px;border-radius:999px;font-size:11px;font-weight:700;background:var(--card2)}
     .verdict.ready{background:#047857}.verdict.locked{background:#9f1239}
     .checks{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:12px}
+    .scroll{max-height:300px;overflow-y:auto}
+    .mkt{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 18px}
     .foot{font-size:11px;color:#475569;text-align:center}
+    @media(max-width:520px){.mkt{grid-template-columns:1fr}}
     @media(max-width:520px){.cards{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:repeat(2,1fr)}}
   </style>
 </head>
@@ -76,6 +79,11 @@
     <div class="card">
       <div class="row" style="font-size:12px;color:var(--mut)"><span>Today's P&L vs target</span><span id="dailyLine">—</span></div>
       <div class="barwrap"><div id="dailyBar" class="bar" style="width:0%"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="margin-bottom:8px"><h2 style="margin:0">Market — Nifty 50 + Index</h2><span id="mktCount" class="sub"></span></div>
+      <div id="market" class="scroll" style="font-size:13px;color:var(--mut)">Live prices appear when the session is running during market hours.</div>
     </div>
 
     <div class="card"><h2>Open positions</h2><div id="positions" style="font-size:13px;color:var(--mut)">None</div></div>
@@ -138,6 +146,14 @@ function render(s){
     pos.map(p=>`<div class="line-item"><span>${p.side} <b>${p.symbol}</b> ×${p.qty} @ ${p.entry_price}</span><span class="${pnlClass(p.unrealized)}">${fmt(p.unrealized)}</span></div>`).join("");
 
   if (s.last_tick) document.getElementById("lastTick").textContent = "last tick: " + new Date(s.last_tick).toLocaleTimeString();
+
+  const mkt = s.market || [];
+  document.getElementById("mktCount").textContent = mkt.length ? mkt.length + " live" : "";
+  if (mkt.length) {
+    document.getElementById("market").innerHTML = '<div class="mkt">' + mkt.map(m =>
+      `<div class="line-item"><span><b>${m.symbol}</b> <span style="color:var(--mut2)">${m.ltp}</span></span>` +
+      `<span class="${pnlClass(m.change)}">${m.change_pct >= 0 ? "+" : ""}${m.change_pct}%</span></div>`).join("") + '</div>';
+  }
 }
 
 const checkLabels = {enough_trades:"Enough trades", net_positive:"Net positive", profit_factor:"Profit factor ≥ target",
