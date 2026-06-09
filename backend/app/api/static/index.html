@@ -89,6 +89,7 @@
       <div id="readyChecks" class="checks"></div>
     </div>
 
+    <div class="card"><h2>Capital growth (monthly compounding)</h2><div id="capital" class="grid">Loading…</div></div>
     <div class="card"><h2>Paper track record</h2><div id="track" class="grid">Loading…</div></div>
     <div class="card"><h2>This month — cost &amp; break-even</h2><div id="econ" class="grid">Loading…</div><div id="econVerdict" style="margin-top:8px;font-size:13px;font-weight:600"></div></div>
     <div class="card"><h2>Today's trades</h2><div id="trades" style="font-size:13px;color:var(--mut)">None yet</div></div>
@@ -150,6 +151,15 @@ async function refreshReadiness(){
   document.getElementById("readyChecks").innerHTML = Object.entries(r.checks).map(([k,ok])=>
     `<div>${ok?"✅":"⛔"} <span style="color:var(--mut)">${checkLabels[k]||k}</span></div>`).join("");
 }
+async function refreshCapital(){
+  const c = await (await fetch("/api/capital")).json();
+  const pct = c.target > 0 ? Math.min(100, (c.current_capital / c.target) * 100) : 0;
+  document.getElementById("capital").innerHTML = `
+    <div><div class="k">Capital base</div><b>${fmt(c.current_capital)}</b></div>
+    <div><div class="k">Banked (withdrawn)</div><span class="pnl-pos">${fmt(c.total_withdrawn)}</span></div>
+    <div><div class="k">Target</div>${fmt(c.target)} (${pct.toFixed(0)}%)</div>
+    <div><div class="k">Monthly compounding</div>${c.compounding_enabled ? "on" : "off"}</div>`;
+}
 async function refreshTrack(){
   const t = await (await fetch("/api/track-record")).json();
   document.getElementById("track").innerHTML = `
@@ -190,8 +200,8 @@ function connectWS(){
   ws.onclose = ()=>setTimeout(connectWS, 2000);
 }
 connectWS();
-refreshReadiness(); refreshTrack(); refreshTrades(); refreshEcon();
-setInterval(()=>{ refreshReadiness(); refreshTrack(); refreshTrades(); refreshEcon(); }, 5000);
+refreshReadiness(); refreshCapital(); refreshTrack(); refreshTrades(); refreshEcon();
+setInterval(()=>{ refreshReadiness(); refreshCapital(); refreshTrack(); refreshTrades(); refreshEcon(); }, 5000);
 </script>
 </body>
 </html>

@@ -6,8 +6,8 @@ def test_scheduler_registers_daily_jobs():
     sched = MarketScheduler(STATE.runner)
     sched.start()
     try:
-        # token refresh, start-day, square-off, end-day.
-        assert len(sched.sched.get_jobs()) == 4
+        # token refresh, start-day, square-off, end-day, monthly compounding.
+        assert len(sched.sched.get_jobs()) == 5
     finally:
         sched.shutdown()
 

@@ -35,6 +35,8 @@ class MarketScheduler:
         self.sched.add_job(self._start_day, CronTrigger(hour=9, minute=14, **weekdays))
         self.sched.add_job(self._square_off, CronTrigger(hour=15, minute=15, **weekdays))
         self.sched.add_job(self._end_day, CronTrigger(hour=15, minute=31, **weekdays))
+        # Monthly compounding: on the 1st, process the previous month's profit.
+        self.sched.add_job(self._month_end, CronTrigger(day=1, hour=8, minute=0))
         self.sched.start()
 
     def shutdown(self) -> None:
@@ -65,6 +67,23 @@ class MarketScheduler:
     def _square_off(self) -> None:
         if is_trading_day(now_ist().date()):
             self.runner.session.flatten_all("square_off")
+
+    def _month_end(self) -> None:
+        from app import capital
+
+        res = capital.process_month()
+        self.log.info("Monthly capital update: %s", res)
+        if res.get("last_profit", 0) and res["last_profit"] > 0:
+            try:
+                from app import notifications
+
+                notifications.send(
+                    f"📈 Monthly capital update — profit ₹{res['last_profit']:.0f}: "
+                    f"reinvested ₹{res['last_reinvested']:.0f}, banked ₹{res['last_withdrawn']:.0f}. "
+                    f"New base ₹{res['current_capital']:.0f} (applies on next restart)."
+                )
+            except Exception:  # noqa: BLE001
+                self.log.exception("Monthly capital notification failed")
 
     def _end_day(self) -> None:
         if not is_trading_day(now_ist().date()):

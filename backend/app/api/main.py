@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.capital import get_current_capital
 from app.config import get_settings
 from app.logging_config import setup_logging
 from app.data.instruments import UNIVERSE
@@ -71,6 +72,7 @@ class _State:
 
     def reset(self) -> None:
         settings = get_settings()
+        capital = get_current_capital(settings)  # compounded base, if any
         regime = MarketRegime() if settings.use_index_filter else None
         strategy = ORBStrategy(
             opening_range_minutes=settings.orb_opening_range_minutes,
@@ -81,7 +83,7 @@ class _State:
             breakout_buffer_pct=settings.orb_breakout_buffer_pct,
             regime=(regime.direction if regime else None),
         )
-        self.session = TradingSession(strategy, settings=settings, regime=regime)
+        self.session = TradingSession(strategy, settings=settings, regime=regime, capital=capital)
         self.runner = LiveRunner(self.session)
         self.thread: threading.Thread | None = None
 
@@ -149,6 +151,21 @@ def readiness() -> dict:
     """Go-live readiness: edge confidence + guardrails. Real money stays locked
     until is_ready is true (or an explicit override is set)."""
     return evaluate_readiness()
+
+
+@app.get("/api/capital")
+def capital_status() -> dict:
+    """Capital base, banked (withdrawn) cash, and progress toward the target."""
+    from app import capital as cap
+
+    s = get_settings()
+    return {
+        "current_capital": cap.get_current_capital(s),
+        "starting_capital": s.capital,
+        "total_withdrawn": cap.get_total_withdrawn(s),
+        "target": s.capital_growth_target,
+        "compounding_enabled": s.enable_monthly_compounding,
+    }
 
 
 @app.get("/api/economics")

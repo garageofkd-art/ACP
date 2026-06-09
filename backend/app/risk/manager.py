@@ -19,9 +19,19 @@ from app.core.events import Signal
 
 
 class RiskManager:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, capital: float | None = None):
         self.s = settings
+        # Sizing/loss caps scale with the (possibly compounded) capital base.
+        self.capital = capital if capital is not None else settings.capital
         self._daily_pnl: dict[date, float] = {}
+
+    @property
+    def risk_per_trade_inr(self) -> float:
+        return self.capital * self.s.risk_per_trade_pct / 100.0
+
+    @property
+    def max_daily_loss_inr(self) -> float:
+        return self.capital * self.s.max_daily_loss_pct / 100.0
 
     @staticmethod
     def per_share_risk(signal: Signal) -> float:
@@ -34,7 +44,7 @@ class RiskManager:
         psr = self.per_share_risk(signal)
         if psr <= 0 or fill_price <= 0:
             return 0
-        qty_by_risk = math.floor(self.s.risk_per_trade_inr / psr)
+        qty_by_risk = math.floor(self.risk_per_trade_inr / psr)
         qty_by_cash = math.floor(available / fill_price)
         return max(0, min(qty_by_risk, qty_by_cash))
 
@@ -43,7 +53,7 @@ class RiskManager:
 
     def kill_switch_tripped(self, day: date) -> bool:
         """Daily loss limit breached -> flatten and stop trading for the day."""
-        return self.daily_pnl(day) <= -self.s.max_daily_loss_inr
+        return self.daily_pnl(day) <= -self.max_daily_loss_inr
 
     def profit_target_hit(self, day: date) -> bool:
         """Daily profit target reached -> bank it and stop for the day."""

@@ -37,6 +37,7 @@ class TradingSession:
         cost: CostConfig | None = None,
         square_off: time | None = None,
         regime=None,
+        capital: float | None = None,
     ):
         self.s = settings or get_settings()
         self.cost = cost or CostConfig()
@@ -44,8 +45,9 @@ class TradingSession:
         self.regime = regime
         self.broker = broker or get_broker(self.s, self.cost)
         self.square_off = square_off or self.s.square_off
-        self.pf = Portfolio(self.s.capital)
-        self.risk = RiskManager(self.s)
+        cap = capital if capital is not None else self.s.capital
+        self.pf = Portfolio(cap)
+        self.risk = RiskManager(self.s, capital=cap)
         self.halted = False
         self.halt_reason: str | None = None
         self._last_price: dict[str, float] = {}

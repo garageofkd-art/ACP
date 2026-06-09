@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     max_drawdown_pct_for_live: float = 15.0   # cap on peak-to-trough, % of capital
     allow_live_override: bool = False         # emergency bypass of the lock (use with care)
 
+    # --- Monthly capital compounding ---
+    enable_monthly_compounding: bool = True
+    capital_reinvest_pct: float = 50.0        # % of each month's profit reinvested into the base
+    capital_growth_target: float = 200_000.0  # grow the base up to here, then harvest
+
     # --- Optional unattended TOTP auto-login (security-sensitive) ---
     upstox_mobile: str = ""
     upstox_pin: str = ""
