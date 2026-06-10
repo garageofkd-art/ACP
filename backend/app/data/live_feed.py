@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import Callable
 
 from app.core.events import Tick
+from app.market_calendar import IST
 
 
 class UpstoxLiveFeed:
@@ -60,5 +61,10 @@ class UpstoxLiveFeed:
             if ltp is None:
                 continue
             ltt = ltpc.get("ltt")  # epoch ms
-            ts = datetime.fromtimestamp(int(ltt) / 1000) if ltt else datetime.now()
+            # Normalize to IST wall-clock (naive) so session_start/square-off are
+            # correct regardless of the host machine's timezone.
+            if ltt:
+                ts = datetime.fromtimestamp(int(ltt) / 1000, IST).replace(tzinfo=None)
+            else:
+                ts = datetime.now(IST).replace(tzinfo=None)
             self.on_tick(Tick(symbol, ts, float(ltp), int(ltpc.get("ltq") or 0)))
