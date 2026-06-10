@@ -200,6 +200,8 @@ def trades() -> list[dict]:
             "entry_price": round(t.entry_price, 2),
             "exit_ts": t.exit_ts.isoformat(),
             "exit_price": round(t.exit_price, 2),
+            "gross_pnl": round(t.gross_pnl, 2),
+            "costs": round(t.costs, 2),
             "net_pnl": round(t.net_pnl, 2),
             "reason": t.reason,
         }

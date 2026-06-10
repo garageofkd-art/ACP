@@ -47,6 +47,9 @@
     .mkt-table th:first-child{text-align:left}
     .mkt-table td{padding:6px;border-bottom:1px solid var(--line)}
     .mkt-table td.num{text-align:right;font-variant-numeric:tabular-nums}
+    .trade-row{cursor:pointer}
+    .trade-detail{font-size:12px;color:var(--mut);padding:4px 0 10px 6px;display:grid;grid-template-columns:repeat(2,1fr);gap:3px 18px;border-bottom:1px solid var(--line)}
+    .trade-detail .dk{color:var(--mut2)}
     .foot{font-size:11px;color:#475569;text-align:center}
     @media(max-width:520px){.cards{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:repeat(2,1fr)}}
   </style>
@@ -211,11 +214,31 @@ async function refreshEcon(){
   v.textContent = e.covering_costs ? "✅ Covering all costs this month" : "⚠️ Not yet covering costs this month";
   v.className = ""; v.style.color = e.covering_costs ? "var(--green)" : "var(--amber)";
 }
-async function refreshTrades(){
-  const rows = await (await fetch("/api/trades")).json();
-  document.getElementById("trades").innerHTML = rows.length===0 ? "None yet" :
-    rows.slice().reverse().map(t=>`<div class="line-item"><span>${t.side} <b>${t.symbol}</b> ×${t.qty} → ${t.reason}</span><span class="${pnlClass(t.net_pnl)}">${fmt(t.net_pnl)}</span></div>`).join("");
+let lastTrades = [];
+const expandedTrades = new Set();
+const tkey = (t) => t.symbol + "|" + t.entry_ts;
+const tm = (iso) => iso ? new Date(iso).toLocaleTimeString() : "—";
+function toggleTrade(key){ expandedTrades.has(key) ? expandedTrades.delete(key) : expandedTrades.add(key); renderTrades(); }
+function renderTrades(){
+  const el = document.getElementById("trades");
+  if (lastTrades.length === 0){ el.innerHTML = "None yet"; return; }
+  el.innerHTML = lastTrades.slice().reverse().map(t => {
+    const key = tkey(t), open = expandedTrades.has(key);
+    const detail = open ? `<div class="trade-detail">
+      <div><span class="dk">Entry</span> ₹${t.entry_price} @ ${tm(t.entry_ts)}</div>
+      <div><span class="dk">Exit</span> ₹${t.exit_price} @ ${tm(t.exit_ts)}</div>
+      <div><span class="dk">Qty</span> ${t.qty}</div>
+      <div><span class="dk">Reason</span> ${t.reason}</div>
+      <div><span class="dk">Gross P&L</span> <span class="${pnlClass(t.gross_pnl)}">${fmt(t.gross_pnl)}</span></div>
+      <div><span class="dk">Costs</span> <span class="pnl-neg">${fmt(t.costs)}</span></div>
+      <div><span class="dk">Net P&L</span> <span class="${pnlClass(t.net_pnl)}">${fmt(t.net_pnl)}</span></div>
+    </div>` : "";
+    return `<div class="trade-row" onclick="toggleTrade('${key}')">
+      <div class="line-item"><span>${open ? "▾" : "▸"} ${t.side} <b>${t.symbol}</b> ×${t.qty} → ${t.reason}</span>` +
+      `<span class="${pnlClass(t.net_pnl)}">${fmt(t.net_pnl)}</span></div>${detail}</div>`;
+  }).join("");
 }
+async function refreshTrades(){ lastTrades = await (await fetch("/api/trades")).json(); renderTrades(); }
 
 function connectWS(){
   const proto = location.protocol==="https:"?"wss":"ws";
