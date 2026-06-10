@@ -19,7 +19,7 @@ from app.core.events import Bar, Tick
 from app.data.aggregator import BarAggregator
 from app.trading.session import TradingSession
 
-_MAX_BACKOFF_S = 60
+_MAX_BACKOFF_S = 120
 
 
 class LiveRunner:
@@ -53,26 +53,46 @@ class LiveRunner:
             feed_keys.append(INDEX_INSTRUMENT_KEY)
         self.running = True
         self.needs_reauth = False
-        backoff = 2
+        attempt = 0
 
         while self.running:
             try:
+                if self._feed is not None:
+                    self._feed.disconnect()  # never leave a connection dangling
                 self._feed = UpstoxLiveFeed(feed_keys, key_to_symbol, self._on_tick)
-                self.log.info("Connecting Upstox live feed for %d instruments…", len(keys))
-                self._feed.connect()  # blocks until disconnect/error
-                backoff = 2
+                self.log.info("Connecting Upstox live feed for %d instruments…", len(feed_keys))
+                self._feed.connect()  # streams in a background thread, returns immediately
+                self.last_error = None
+                attempt = 0
+                # Connected: hold this thread open while the SDK streams. We do NOT
+                # recreate the connection in a loop — doing so floods Upstox (429).
+                while self.running:
+                    _time.sleep(1)
             except Exception as exc:  # noqa: BLE001
                 self.last_error = f"{type(exc).__name__}: {exc}"
-                self.log.error("Feed error: %s", self.last_error)
                 if "401" in str(exc) or "unauthor" in str(exc).lower():
                     self.needs_reauth = True
-                    self.log.error("Upstox token looks invalid/expired — re-authentication required.")
+                    self.log.error("Upstox token invalid/expired — re-authentication required.")
                     break
+                attempt += 1
+                rate_limited = "429" in str(exc) or "too many" in str(exc).lower()
+                wait = 60 if rate_limited else min(15 * attempt, _MAX_BACKOFF_S)
+                self.log.error("Feed error: %s — reconnecting in %ds (attempt %d).",
+                               self.last_error, wait, attempt)
+                self._sleep_responsive(wait)
+
+        if self._feed is not None:
+            try:
+                self._feed.disconnect()
+            except Exception:  # noqa: BLE001
+                pass
+
+    def _sleep_responsive(self, seconds: int) -> None:
+        """Sleep, but wake immediately if stop() is called."""
+        for _ in range(int(seconds)):
             if not self.running:
-                break
-            self.log.info("Reconnecting in %ds…", backoff)
-            _time.sleep(backoff)
-            backoff = min(backoff * 2, _MAX_BACKOFF_S)
+                return
+            _time.sleep(1)
 
     def stop(self) -> None:
         self.running = False
