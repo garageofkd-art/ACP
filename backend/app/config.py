@@ -101,6 +101,7 @@ class Settings(BaseSettings):
     orb_max_range_pct: float = 0.05     # skip gap/news-distorted wide ranges (0 = off)
     orb_volume_mult: float = 1.0        # breakout volume vs avg OR-bar volume (0 = off)
     orb_breakout_buffer_pct: float = 0.0005  # require a decisive break past the range
+    orb_anchor_first_bar: bool = False  # anchor the range to start time (for late starts/testing)
     use_index_filter: bool = True       # only long when Nifty up / short when down
 
     @property

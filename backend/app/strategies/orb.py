@@ -28,6 +28,7 @@ class _SymbolState:
     vol_sum: float = 0.0
     bar_count: int = 0
     traded: bool = False
+    or_start: time | None = None  # used when anchoring the range to the first bar
 
 
 class ORBStrategy(Strategy):
@@ -44,12 +45,16 @@ class ORBStrategy(Strategy):
         volume_mult: float = 1.0,
         breakout_buffer_pct: float = 0.0005,
         regime: Callable[[], int] | None = None,
+        anchor_first_bar: bool = False,
     ):
         self.n = opening_range_minutes
         self.target_r = target_r
         self.session_start = session_start
         self.latest_entry = latest_entry
         self.breakout_buffer_pct = breakout_buffer_pct
+        # When True, anchor the opening range to the first bar seen each day
+        # instead of the fixed market open — lets a late start still trade.
+        self.anchor_first_bar = anchor_first_bar
         # Optional market-regime gate: returns +1/-1/0. Longs need >=0, shorts <=0.
         self.regime = regime
         # Filters: skip days whose opening range is too narrow (choppy/dead) or
@@ -63,9 +68,9 @@ class ORBStrategy(Strategy):
     def reset(self) -> None:
         self._state = {}
 
-    def _end_of_range(self) -> time:
-        base = datetime(2000, 1, 1, self.session_start.hour, self.session_start.minute)
-        return (base + timedelta(minutes=self.n)).time()
+    def _add_minutes(self, start: time, minutes: int) -> time:
+        base = datetime(2000, 1, 1, start.hour, start.minute, start.second)
+        return (base + timedelta(minutes=minutes)).time()
 
     def on_bar(self, bar: Bar) -> list[Signal]:
         d = bar.ts.date()
@@ -75,11 +80,21 @@ class ORBStrategy(Strategy):
             self._state[bar.symbol] = st
 
         t = bar.ts.time()
-        if t < self.session_start:
-            return []
+
+        # Where does the opening range start? Fixed market open, or the first bar
+        # of the day for this symbol (anchor mode, for late starts).
+        if self.anchor_first_bar:
+            if st.or_start is None:
+                st.or_start = t
+            range_start = st.or_start
+        else:
+            if t < self.session_start:
+                return []
+            range_start = self.session_start
+        end_of_range = self._add_minutes(range_start, self.n)
 
         # Phase 1: accumulate the opening range.
-        if t < self._end_of_range():
+        if t < end_of_range:
             st.or_high = max(st.or_high, bar.high)
             st.or_low = min(st.or_low, bar.low)
             st.vol_sum += bar.volume
