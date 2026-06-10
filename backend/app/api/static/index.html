@@ -68,7 +68,6 @@
       <button class="btn green" onclick="startSession()">Start</button>
       <button class="btn red" onclick="stopSession()">Stop</button>
       <button class="btn slate" onclick="testAlert()">Test alert</button>
-      <button class="btn slate" onclick="testTrade()">Test trade</button>
       <span id="runState" class="state">idle</span>
     </div>
 
@@ -120,13 +119,6 @@ const pnlClass = (n) => n > 0 ? "pnl-pos" : (n < 0 ? "pnl-neg" : "");
 async function connectUpstox(){ const {url} = await (await fetch("/api/auth/login")).json(); window.open(url, "_blank"); }
 async function startSession(){ const r = await fetch("/api/session/start",{method:"POST"}); if(!r.ok) alert((await r.json()).detail||"Could not start"); }
 async function stopSession(){ await fetch("/api/session/stop",{method:"POST"}); }
-async function testTrade(){
-  const r = await fetch("/api/session/test-trade",{method:"POST"});
-  const d = await r.json();
-  if(!r.ok){ alert(d.detail || "Could not place test trade"); return; }
-  const t = d.trade;
-  alert(`Paper test trade done: ${t.symbol} ×${t.qty} @ ₹${t.entry_price} → ₹${t.exit_price}\nNet P&L: ₹${t.net_pnl} (cost ₹${t.costs}). See Today's trades.`);
-}
 async function testAlert(){ const r = await (await fetch("/api/notify/test",{method:"POST"})).json();
   alert(r.configured ? (r.sent ? "Test alert sent ✅" : "Configured but send failed — check logs.") : "No notification channel configured (set Telegram or SMTP in .env)."); }
 
