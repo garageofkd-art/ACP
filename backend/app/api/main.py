@@ -253,7 +253,12 @@ def auth_callback(code: str | None = None, error: str | None = None) -> str:
     if not token:
         return f"<h3>Token exchange failed: {payload}</h3>"
     persist_token(token)
-    STATE.reset()  # rebuild session with the new token in effect
+    # Do NOT reset the session here — that would wipe open positions and the
+    # opening ranges. persist_token clears the settings cache, so the new token
+    # is picked up on the next feed (re)connect. Only build a fresh session if
+    # one isn't running yet (first connect of the day).
+    if not STATE.runner.running and not STATE.session.pf.trades and not STATE.session.pf.positions:
+        STATE.reset()
     return "<h3>Upstox connected. You can close this tab and return to QuantifyWealth.</h3>"
 
 
