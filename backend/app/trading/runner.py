@@ -20,6 +20,7 @@ from app.data.aggregator import BarAggregator
 from app.trading.session import TradingSession
 
 _MAX_BACKOFF_S = 120
+STALE_RECONNECT_S = 90  # reconnect if no ticks for this long during market hours
 
 
 class LiveRunner:
@@ -64,10 +65,10 @@ class LiveRunner:
                 self._feed.connect()  # streams in a background thread, returns immediately
                 self.last_error = None
                 attempt = 0
-                # Connected: hold this thread open while the SDK streams. We do NOT
-                # recreate the connection in a loop — doing so floods Upstox (429).
-                while self.running:
-                    _time.sleep(1)
+                # Connected: hold open while the SDK streams, but watch for a
+                # silently-dropped connection (ticks stop) and reconnect if stale.
+                # We do NOT recreate in a tight loop — that floods Upstox (429).
+                self._hold_until_stale()
             except Exception as exc:  # noqa: BLE001
                 self.last_error = f"{type(exc).__name__}: {exc}"
                 if "401" in str(exc) or "unauthor" in str(exc).lower():
@@ -86,6 +87,24 @@ class LiveRunner:
                 self._feed.disconnect()
             except Exception:  # noqa: BLE001
                 pass
+
+    def _hold_until_stale(self) -> None:
+        """Hold the connection open. If no tick arrives for STALE_RECONNECT_S
+        while the market is open, return so the outer loop reconnects once
+        (graceful recovery from a silently-dropped feed — not a 429 storm)."""
+        from app.market_calendar import is_market_open
+
+        last_seen = self.last_tick_ts
+        stale_since = _time.monotonic()
+        while self.running:
+            _time.sleep(2)
+            if self.last_tick_ts != last_seen:
+                last_seen = self.last_tick_ts
+                stale_since = _time.monotonic()
+            elif is_market_open() and (_time.monotonic() - stale_since) > STALE_RECONNECT_S:
+                self.log.warning("No ticks for %ds during market hours — reconnecting feed.",
+                                 STALE_RECONNECT_S)
+                return
 
     def _sleep_responsive(self, seconds: int) -> None:
         """Sleep, but wake immediately if stop() is called."""
