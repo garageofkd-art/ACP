@@ -223,6 +223,15 @@ def start_session() -> dict:
     return {"running": True, "mode": s.trading_mode}
 
 
+@app.post("/api/position/close")
+def close_position(symbol: str) -> dict:
+    """Manually close one open position at the current price (the Sell button)."""
+    try:
+        return {"ok": True, **STATE.session.close_position(symbol)}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
 @app.post("/api/session/stop")
 def stop_session() -> dict:
     STATE.runner.stop()

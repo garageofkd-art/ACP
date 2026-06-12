@@ -153,6 +153,16 @@ class TradingSession:
             ref = self._last_price.get(symbol, self.pf.positions[symbol].entry_price)
             self._close(symbol, ref, ts, reason)
 
+    def close_position(self, symbol: str) -> dict:
+        """Manually close one open position at the current price (user override)."""
+        if symbol not in self.pf.positions:
+            raise ValueError(f"No open position in {symbol}.")
+        ref = self._last_price.get(symbol, self.pf.positions[symbol].entry_price)
+        self._close(symbol, ref, datetime.now(), "manual_close")
+        trade = self.pf.trades[-1]
+        self.log.info("MANUAL CLOSE %s at %.2f — net ₹%.2f", symbol, ref, trade.net_pnl)
+        return {"symbol": symbol, "exit_price": round(ref, 2), "net_pnl": round(trade.net_pnl, 2)}
+
     def place_test_trade(self, symbol: str | None = None) -> dict:
         """Manual smoke-test: a complete paper round-trip (buy + immediate sell)
         at the live price, to prove the execution -> portfolio -> journal path.

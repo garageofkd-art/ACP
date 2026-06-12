@@ -47,6 +47,7 @@
     .mkt-table th:first-child{text-align:left}
     .mkt-table td{padding:6px;border-bottom:1px solid var(--line)}
     .mkt-table td.num{text-align:right;font-variant-numeric:tabular-nums}
+    .sell-btn{padding:3px 10px;border:0;border-radius:8px;font-size:12px;font-weight:600;color:#fff;background:#e11d48;cursor:pointer}
     .trade-row{cursor:pointer}
     .trade-detail{font-size:12px;color:var(--mut);padding:4px 0 10px 6px;display:grid;grid-template-columns:repeat(2,1fr);gap:3px 18px;border-bottom:1px solid var(--line)}
     .trade-detail .dk{color:var(--mut2)}
@@ -122,6 +123,13 @@ const pnlClass = (n) => n > 0 ? "pnl-pos" : (n < 0 ? "pnl-neg" : "");
 async function connectUpstox(){ const {url} = await (await fetch("/api/auth/login")).json(); window.open(url, "_blank"); }
 async function startSession(){ const r = await fetch("/api/session/start",{method:"POST"}); if(!r.ok) alert((await r.json()).detail||"Could not start"); }
 async function stopSession(){ await fetch("/api/session/stop",{method:"POST"}); }
+async function closePos(sym){
+  if(!confirm(`Close ${sym} now at the current price?`)) return;
+  const r = await fetch("/api/position/close?symbol="+encodeURIComponent(sym),{method:"POST"});
+  const d = await r.json();
+  if(!r.ok){ alert(d.detail||"Could not close"); return; }
+  alert(`Closed ${sym} @ ₹${d.exit_price} — net ₹${d.net_pnl}`);
+}
 async function testAlert(){ const r = await (await fetch("/api/notify/test",{method:"POST"})).json();
   alert(r.configured ? (r.sent ? "Test alert sent ✅" : "Configured but send failed — check logs.") : "No notification channel configured (set Telegram or SMTP in .env)."); }
 
@@ -146,7 +154,9 @@ function render(s){
 
   const pos = s.open_positions||[];
   document.getElementById("positions").innerHTML = pos.length===0 ? "None" :
-    pos.map(p=>`<div class="line-item"><span>${p.side} <b>${p.symbol}</b> ×${p.qty} @ ${p.entry_price}</span><span class="${pnlClass(p.unrealized)}">${fmt(p.unrealized)}</span></div>`).join("");
+    pos.map(p=>`<div class="line-item"><span>${p.side} <b>${p.symbol}</b> ×${p.qty} @ ${p.entry_price}</span>`+
+      `<span style="display:flex;align-items:center;gap:10px"><span class="${pnlClass(p.unrealized)}">${fmt(p.unrealized)}</span>`+
+      `<button class="sell-btn" onclick="closePos('${p.symbol}')">Close</button></span></div>`).join("");
 
   if (s.last_tick) document.getElementById("lastTick").textContent = "last tick: " + new Date(s.last_tick).toLocaleTimeString();
 }
