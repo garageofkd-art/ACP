@@ -104,6 +104,12 @@ class Settings(BaseSettings):
     orb_anchor_first_bar: bool = False  # anchor the range to start time (for late starts/testing)
     use_index_filter: bool = True       # only long when Nifty up / short when down
 
+    # --- Strategy selector + mean-reversion params ---
+    strategy: str = "orb"               # orb | mean_reversion
+    mr_entry_pct: float = 0.006         # stretch from VWAP to trigger a fade
+    mr_stop_pct: float = 0.004          # further extension that stops us out
+    mr_warmup_minutes: int = 15
+
     @property
     def is_live(self) -> bool:
         return self.trading_mode.lower() == "live"

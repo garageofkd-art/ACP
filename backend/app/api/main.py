@@ -24,7 +24,7 @@ from app.economics import monthly_cost_report
 from app.journal import save_session_day, track_record
 from app.readiness import evaluate as evaluate_readiness
 from app.data.upstox_client import exchange_code_for_token, login_url, persist_token
-from app.strategies.orb import ORBStrategy
+from app.strategies.factory import build_strategy, uses_index
 from app.strategies.regime import MarketRegime
 from app.trading.runner import LiveRunner
 from app.trading.session import TradingSession
@@ -73,17 +73,8 @@ class _State:
     def reset(self) -> None:
         settings = get_settings()
         capital = get_current_capital(settings)  # compounded base, if any
-        regime = MarketRegime() if settings.use_index_filter else None
-        strategy = ORBStrategy(
-            opening_range_minutes=settings.orb_opening_range_minutes,
-            target_r=settings.orb_target_r,
-            min_range_pct=settings.orb_min_range_pct,
-            max_range_pct=settings.orb_max_range_pct,
-            volume_mult=settings.orb_volume_mult,
-            breakout_buffer_pct=settings.orb_breakout_buffer_pct,
-            anchor_first_bar=settings.orb_anchor_first_bar,
-            regime=(regime.direction if regime else None),
-        )
+        regime = MarketRegime() if uses_index(settings) else None
+        strategy = build_strategy(settings, regime.direction if regime else None)
         self.session = TradingSession(strategy, settings=settings, regime=regime, capital=capital)
         self.runner = LiveRunner(self.session)
         self.thread: threading.Thread | None = None

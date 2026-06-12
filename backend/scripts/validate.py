@@ -15,7 +15,7 @@ from app.backtest.optimizer import split_by_date
 from app.config import get_settings
 from app.data.historical import load_cached
 from app.data.instruments import INDEX_INSTRUMENT_KEY, INDEX_SYMBOL, resolve_instrument_keys
-from app.strategies.orb import ORBStrategy
+from app.strategies.factory import build_strategy, uses_index
 from app.strategies.regime import MarketRegime
 
 
@@ -32,18 +32,10 @@ def _load() -> dict:
 
 
 def _build():
-    """A fresh strategy + regime built from the live .env config."""
+    """A fresh strategy + regime built from the live .env config (respects STRATEGY)."""
     s = get_settings()
-    regime = MarketRegime() if s.use_index_filter else None
-    strat = ORBStrategy(
-        opening_range_minutes=s.orb_opening_range_minutes,
-        target_r=s.orb_target_r,
-        min_range_pct=s.orb_min_range_pct,
-        max_range_pct=s.orb_max_range_pct,
-        volume_mult=s.orb_volume_mult,
-        breakout_buffer_pct=s.orb_breakout_buffer_pct,
-        regime=(regime.direction if regime else None),
-    )
+    regime = MarketRegime() if uses_index(s) else None
+    strat = build_strategy(s, regime.direction if regime else None)
     return strat, regime
 
 
@@ -69,6 +61,7 @@ def main() -> None:
         return
 
     has_index = INDEX_SYMBOL in data
+    print(f"Strategy: {get_settings().strategy}")
     print(f"Loaded {len(stocks)} symbols; index data: {'yes' if has_index else 'NO (regime filter inactive)'}\n")
 
     print("=== Full-period backtest (live config) ===")
