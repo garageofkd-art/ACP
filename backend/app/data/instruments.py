@@ -93,6 +93,38 @@ UNIVERSE: list[Instrument] = [
 
 UNIVERSE_BY_SYMBOL: dict[str, Instrument] = {i.symbol: i for i in UNIVERSE}
 
+# --- Broader, less-efficient universe (mid/small-caps) for research ----------
+# Trend/momentum edges are strongest where the market is least arbitraged. Keys
+# are resolved from the Upstox master at runtime; any symbol not found is skipped.
+_MIDCAP_NAMES = [
+    "DIXON", "PERSISTENT", "COFORGE", "MPHASIS", "TATAELXSI", "POLYCAB", "ASTRAL",
+    "SUPREMEIND", "APLAPOLLO", "JUBLFOOD", "PAGEIND", "HAVELLS", "VOLTAS", "CROMPTON",
+    "CDSL", "BSE", "MCX", "ANGELONE", "CAMS", "IEX", "IRCTC", "IRFC", "RVNL", "MAZDOCK",
+    "HAL", "BDL", "NHPC", "SJVN", "OIL", "GAIL", "PETRONET", "IGL", "MGL", "AARTIIND",
+    "DEEPAKNTR", "NAVINFLUOR", "TATACHEM", "PIIND", "COROMANDEL", "BALRAMCHIN",
+    "UNIONBANK", "CANBK", "PNB", "FEDERALBNK", "IDFCFIRSTB", "AUBANK", "BANDHANBNK",
+    "RBLBANK", "BANKBARODA", "LICHSGFIN", "CHOLAFIN", "MUTHOOTFIN", "MANAPPURAM",
+    "PEL", "ABCAPITAL", "ABFRL", "VBL", "UBL", "MARICO", "DABUR", "GODREJCP", "COLPAL",
+    "MAXHEALTH", "FORTIS", "LALPATHLAB", "LUPIN", "BIOCON", "AUROPHARMA", "ALKEM",
+    "TORNTPHARM", "ZYDUSLIFE", "OBEROIRLTY", "PRESTIGE", "DLF", "GODREJPROP", "LODHA",
+    "IDEA", "TATAPOWER", "TATACOMM", "JINDALSTEL", "VEDL", "SAIL", "NMDC", "NATIONALUM",
+    "ASHOKLEY", "TVSMOTOR", "BHARATFORG", "MOTHERSON", "BOSCHLTD", "ICICIPRULI",
+    "ICICIGI", "HUDCO", "YESBANK", "INDHOTEL", "ZOMATO", "PAYTM", "NYKAA", "POLICYBZR",
+]
+MIDCAP_EXTRA: list[Instrument] = [Instrument(s, s) for s in _MIDCAP_NAMES]
+BROAD_UNIVERSE: list[Instrument] = UNIVERSE + MIDCAP_EXTRA
+
+
+def active_universe(settings=None) -> list[Instrument]:
+    from app.config import get_settings
+
+    s = settings or get_settings()
+    return BROAD_UNIVERSE if s.universe.lower() == "broad" else UNIVERSE
+
+
+def active_symbols(settings=None) -> list[str]:
+    return [i.symbol for i in active_universe(settings)]
+
 # Nifty 50 index — streamed for the market-regime filter, never traded.
 INDEX_SYMBOL = "NIFTY50"
 INDEX_INSTRUMENT_KEY = "NSE_INDEX|Nifty 50"

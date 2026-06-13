@@ -32,3 +32,7 @@ compare:
 validate-positional:
 	PYTHONPATH=. python -m scripts.fetch_history --interval day --days 1095
 	PYTHONPATH=. python -m scripts.validate_positional
+
+validate-broad:
+	UNIVERSE=broad PYTHONPATH=. python -m scripts.fetch_history --interval day --days 1095
+	UNIVERSE=broad PYTHONPATH=. python -m scripts.validate_positional

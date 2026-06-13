@@ -104,6 +104,9 @@ class Settings(BaseSettings):
     orb_anchor_first_bar: bool = False  # anchor the range to start time (for late starts/testing)
     use_index_filter: bool = True       # only long when Nifty up / short when down
 
+    # Universe: nifty50 (default, live) | broad (Nifty50 + mid/small-caps, for research)
+    universe: str = "nifty50"
+
     # --- Strategy selector + mean-reversion params ---
     strategy: str = "orb"               # orb | mean_reversion
     mr_entry_pct: float = 0.006         # stretch from VWAP to trigger a fade

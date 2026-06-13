@@ -16,7 +16,7 @@ from app.backtest.metrics import per_symbol
 from app.backtest.optimizer import split_by_date
 from app.config import get_settings
 from app.data.historical import load_cached
-from app.data.instruments import resolve_instrument_keys
+from app.data.instruments import active_symbols, resolve_instrument_keys
 from app.strategies.trend import TrendBreakoutStrategy
 
 MAX_POSITIONS = 10  # trend-following wants a diversified book, not 3 names
@@ -24,7 +24,7 @@ MAX_POSITIONS = 10  # trend-following wants a diversified book, not 3 names
 
 def _load() -> dict:
     data = {}
-    for sym, key in resolve_instrument_keys().items():
+    for sym, key in resolve_instrument_keys(active_symbols()).items():
         df = load_cached(key, interval="day")
         if not df.empty:
             data[sym] = df

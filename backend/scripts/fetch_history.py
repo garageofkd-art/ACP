@@ -15,7 +15,9 @@ import argparse
 from datetime import date, timedelta
 
 from app.data.historical import fetch_historical
-from app.data.instruments import INDEX_INSTRUMENT_KEY, INDEX_SYMBOL, resolve_instrument_keys
+from app.data.instruments import (
+    INDEX_INSTRUMENT_KEY, INDEX_SYMBOL, active_symbols, resolve_instrument_keys,
+)
 
 CHUNK_DAYS = 28
 
@@ -53,7 +55,7 @@ def main() -> None:
     ap.add_argument("--interval", default="1minute", help="1minute | 30minute | day")
     args = ap.parse_args()
 
-    keys = resolve_instrument_keys()
+    keys = resolve_instrument_keys(active_symbols())   # respects UNIVERSE (nifty50|broad)
     keys[INDEX_SYMBOL] = INDEX_INSTRUMENT_KEY  # index for the regime filter
     print(f"Fetching {args.days}d of {args.interval} candles for {len(keys)} instruments…\n")
 
