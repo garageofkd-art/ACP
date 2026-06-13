@@ -48,12 +48,16 @@ class BacktestEngine:
         cost: CostConfig | None = None,
         square_off: time | None = None,
         regime=None,
+        intraday: bool = True,
     ):
         self.strategy = strategy
         self.s = settings or get_settings()
         self.cost = cost or CostConfig()
         self.square_off = square_off or self.s.square_off
         self.regime = regime
+        # Intraday: engine manages stop/target/square-off. Positional: positions
+        # are held overnight and the strategy owns exits via EXIT signals.
+        self.intraday = intraday
 
     def run(self, data: dict[str, pd.DataFrame]) -> BacktestResult:
         pf = Portfolio(self.s.capital)
@@ -76,13 +80,20 @@ class BacktestEngine:
             t = bar.ts.time()
             day = bar.ts.date()
 
-            # 1) Manage an open position on this symbol (exits take priority).
-            if bar.symbol in pf.positions:
+            # 1) Intraday: engine manages stop/target/square-off (exits take priority).
+            if bar.symbol in pf.positions and self.intraday:
                 self._manage(pf, risk, bar, t)
 
-            # 2) Always advance strategy state; act on entries only if flat.
+            # 2) Advance strategy state.
             signals = self.strategy.on_bar(bar)
-            if bar.symbol not in pf.positions:
+
+            if bar.symbol in pf.positions:
+                # Strategy-requested exit (positional strategies own their exits).
+                for sig in signals:
+                    if sig.type is SignalType.EXIT:
+                        self._close(pf, risk, bar.symbol, bar.ts, bar.close, sig.reason or "exit")
+                        break
+            else:
                 for sig in signals:
                     if sig.type is not SignalType.ENTRY:
                         continue
@@ -128,12 +139,12 @@ class BacktestEngine:
         if pos.side == Side.BUY:
             if bar.low <= pos.stop:
                 exit_price, reason = pos.stop, "stop"
-            elif bar.high >= pos.target:
+            elif pos.target is not None and bar.high >= pos.target:
                 exit_price, reason = pos.target, "target"
         else:  # short
             if bar.high >= pos.stop:
                 exit_price, reason = pos.stop, "stop"
-            elif bar.low <= pos.target:
+            elif pos.target is not None and bar.low <= pos.target:
                 exit_price, reason = pos.target, "target"
 
         if exit_price is None and t >= self.square_off:

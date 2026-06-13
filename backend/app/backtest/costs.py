@@ -25,6 +25,7 @@ from app.core.events import Side
 class CostConfig:
     brokerage_per_order: float = 20.0
     brokerage_pct: float = 0.0005      # 0.05%
+    stt_buy_pct: float = 0.0           # intraday: no STT on buy
     stt_sell_pct: float = 0.00025      # 0.025% (sell side)
     exchange_txn_pct: float = 0.0000297  # ~0.00297%
     sebi_pct: float = 0.000001         # ₹10 / crore
@@ -33,13 +34,28 @@ class CostConfig:
     slippage_pct: float = 0.0002       # 0.02% adverse fill
 
 
+# Delivery/positional charges: STT is 0.1% on BOTH legs, higher stamp duty, but
+# spread across far bigger moves than intraday — so cost as a % of the move is small.
+DELIVERY_COSTS = CostConfig(
+    brokerage_per_order=20.0,
+    brokerage_pct=0.0025,
+    stt_buy_pct=0.001,
+    stt_sell_pct=0.001,
+    exchange_txn_pct=0.0000297,
+    sebi_pct=0.000001,
+    gst_pct=0.18,
+    stamp_buy_pct=0.00015,   # 0.015% (delivery)
+    slippage_pct=0.0005,
+)
+
+
 def charges(side: Side, qty: int, price: float, cfg: CostConfig) -> float:
     """Total statutory + brokerage charges for one executed leg."""
     turnover = qty * price
     if turnover <= 0:
         return 0.0
     brokerage = min(cfg.brokerage_per_order, turnover * cfg.brokerage_pct)
-    stt = turnover * cfg.stt_sell_pct if side == Side.SELL else 0.0
+    stt = turnover * (cfg.stt_sell_pct if side == Side.SELL else cfg.stt_buy_pct)
     exch = turnover * cfg.exchange_txn_pct
     sebi = turnover * cfg.sebi_pct
     gst = cfg.gst_pct * (brokerage + exch + sebi)
