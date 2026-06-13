@@ -28,3 +28,7 @@ validate:
 
 compare:
 	PYTHONPATH=. python -m scripts.compare
+
+validate-positional:
+	PYTHONPATH=. python -m scripts.fetch_history --interval day --days 1095
+	PYTHONPATH=. python -m scripts.validate_positional

@@ -22,6 +22,15 @@ CHUNK_DAYS = 28
 
 def _fetch_all(key: str, days: int, interval: str) -> int:
     """Fetch `days` of history for one instrument in chunks; return candle count."""
+    # Daily/weekly/monthly candles allow long ranges per request — no chunking.
+    if interval in ("day", "week", "month"):
+        try:
+            return len(fetch_historical(key, date.today() - timedelta(days=days), date.today(),
+                                        interval=interval))
+        except Exception as exc:  # noqa: BLE001
+            print(f"      skipped ({type(exc).__name__})")
+            return 0
+
     total = 0
     chunk_end = date.today()
     remaining = days
