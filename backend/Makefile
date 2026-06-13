@@ -25,3 +25,6 @@ optimize:
 validate:
 	PYTHONPATH=. python -m scripts.fetch_history --days 180
 	PYTHONPATH=. python -m scripts.validate
+
+compare:
+	PYTHONPATH=. python -m scripts.compare
