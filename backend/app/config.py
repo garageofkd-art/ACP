@@ -107,6 +107,11 @@ class Settings(BaseSettings):
     # Universe: nifty50 (default, live) | broad (Nifty50 + mid/small-caps, for research)
     universe: str = "nifty50"
 
+    # --- AI backtester: plain-English -> StrategySpec translation ---
+    # When set, the translator uses Claude to parse strategy descriptions; otherwise
+    # it falls back to a deterministic keyword parser (works fully offline).
+    anthropic_api_key: str = ""
+
     # --- Strategy selector + mean-reversion params ---
     strategy: str = "orb"               # orb | mean_reversion
     mr_entry_pct: float = 0.006         # stretch from VWAP to trigger a fade

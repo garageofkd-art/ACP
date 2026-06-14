@@ -10,6 +10,9 @@ pydantic
 pydantic-settings
 python-dotenv
 
+# AI layer (English -> strategy spec, result explanations)
+anthropic
+
 # Data / analysis
 pandas
 numpy
