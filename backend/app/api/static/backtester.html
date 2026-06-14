@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Honest Backtester</title>
+  <style>
+    :root{--bg:#020617;--card:#0f172a;--card2:#1e293b;--line:#1e293b;--txt:#e2e8f0;--mut:#94a3b8;--mut2:#64748b;
+          --green:#10b981;--greenbg:#064e3b;--red:#f43f5e;--redbg:#7f1d1d;--amber:#f59e0b;--amberbg:#78350f;--indigo:#6366f1;}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+    .wrap{max-width:720px;margin:0 auto;padding:18px;display:flex;flex-direction:column;gap:14px}
+    h1{font-size:24px;font-weight:700;margin:0}
+    .sub{font-size:12px;color:var(--mut);line-height:1.5}
+    .card{background:var(--card);border-radius:12px;padding:16px}
+    label{font-size:12px;font-weight:600;color:#cbd5e1;display:block;margin-bottom:7px}
+    textarea{width:100%;min-height:90px;background:var(--card2);border:1px solid #334155;border-radius:10px;
+             color:var(--txt);font-size:14px;padding:11px;resize:vertical;font-family:inherit}
+    textarea:focus{outline:none;border-color:var(--indigo)}
+    .btn{padding:11px 18px;border:0;border-radius:10px;font-size:14px;font-weight:700;color:#fff;cursor:pointer;background:var(--indigo)}
+    .btn:disabled{opacity:.5;cursor:default}
+    .examples{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+    .chip{font-size:11px;color:var(--mut);background:var(--card2);border:1px solid #334155;border-radius:999px;
+          padding:5px 11px;cursor:pointer}
+    .chip:hover{border-color:var(--indigo);color:var(--txt)}
+    .verdict{font-size:18px;font-weight:800;letter-spacing:.3px}
+    .verdict.PROMISING{color:var(--green)}.verdict.NO{color:var(--red)}.verdict.INSUFFICIENT{color:var(--amber)}
+    .pill{display:inline-block;font-size:10px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--card2);color:var(--mut)}
+    .explain{font-size:14px;line-height:1.6;color:#e2e8f0;margin:10px 0 0}
+    table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}
+    th,td{text-align:right;padding:7px 6px;border-bottom:1px solid var(--line)}
+    th:first-child,td:first-child{text-align:left;color:var(--mut)}
+    th{font-size:11px;color:var(--mut2);font-weight:600}
+    .pos{color:var(--green)}.neg{color:var(--red)}
+    .rules{font-size:12px;color:var(--mut);margin-top:12px;line-height:1.6}
+    .rules code{background:var(--card2);padding:1px 6px;border-radius:5px;color:#cbd5e1}
+    .err{color:var(--red);font-size:13px}
+    .spin{display:inline-block;width:15px;height:15px;border:2px solid #334155;border-top-color:var(--indigo);
+          border-radius:50%;animation:s .7s linear infinite;vertical-align:-3px;margin-right:7px}
+    @keyframes s{to{transform:rotate(360deg)}}
+    a{color:var(--indigo)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div>
+      <h1>Honest Backtester</h1>
+      <p class="sub">Describe a trading idea in plain English. It compiles into a real rule, backtests on
+        Indian equity history with realistic costs, and checks it on data it never saw — then tells you the
+        truth: does it actually have an edge, or not? Most ideas don't. This won't pretend otherwise.</p>
+    </div>
+
+    <div class="card">
+      <label for="desc">Your strategy, in your words</label>
+      <textarea id="desc" placeholder="e.g. Buy when the close breaks above the 20-day high, exit when it falls below the 10-day low, 8% stop loss."></textarea>
+      <div class="examples" id="examples"></div>
+      <div style="margin-top:12px;display:flex;align-items:center;gap:12px">
+        <button class="btn" id="run">Backtest it</button>
+        <span class="sub" id="hint">Out-of-sample tested · costs included · no cherry-picking</span>
+      </div>
+    </div>
+
+    <div class="card" id="out" style="display:none"></div>
+  </div>
+
+  <script>
+    const EXAMPLES = [
+      "Buy when the close breaks above the 20-day high, exit when it falls below the 10-day low, 8% stop.",
+      "Buy when RSI(5) is below 30, sell when RSI(5) rises above 55, 5% stop loss.",
+      "Go long when price is above the 50-day moving average; exit when it drops below the 20-day moving average.",
+    ];
+    const ex = document.getElementById('examples');
+    EXAMPLES.forEach(t => {
+      const c = document.createElement('span');
+      c.className = 'chip'; c.textContent = t.length > 60 ? t.slice(0, 57) + '…' : t;
+      c.onclick = () => { document.getElementById('desc').value = t; };
+      ex.appendChild(c);
+    });
+
+    const inr = n => '₹' + Math.round(n).toLocaleString('en-IN');
+    const cls = n => n > 0 ? 'pos' : n < 0 ? 'neg' : '';
+    const out = document.getElementById('out');
+    const btn = document.getElementById('run');
+
+    function condText(c) {
+      const lhs = c.indicator + (c.lookback ? '(' + c.lookback + ')' : '');
+      const rhs = c.value != null ? c.value
+        : c.other_indicator + (c.other_lookback ? '(' + c.other_lookback + ')' : '');
+      return lhs + ' ' + c.op + ' ' + rhs;
+    }
+    function statsRow(label, s) {
+      if (!s) return '<tr><td>' + label + '</td><td colspan="3" style="color:var(--mut2)">—</td></tr>';
+      return '<tr><td>' + label + '</td>'
+        + '<td>' + s.num_trades + '</td>'
+        + '<td class="' + cls(s.net_pnl) + '">' + inr(s.net_pnl) + '</td>'
+        + '<td>' + (s.profit_factor != null ? s.profit_factor.toFixed(2) : '—') + '</td></tr>';
+    }
+
+    async function run() {
+      const description = document.getElementById('desc').value.trim();
+      if (!description) { document.getElementById('desc').focus(); return; }
+      btn.disabled = true; out.style.display = 'block';
+      out.innerHTML = '<span class="spin"></span>Compiling your idea and backtesting across the universe…';
+      try {
+        const r = await fetch('/api/backtest', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ description })
+        });
+        const d = await r.json();
+        if (!r.ok) { out.innerHTML = '<p class="err">' + (d.detail || 'Something went wrong.') + '</p>'; return; }
+        render(d);
+      } catch (e) {
+        out.innerHTML = '<p class="err">Network error: ' + e.message + '</p>';
+      } finally { btn.disabled = false; }
+    }
+
+    function render(d) {
+      const v = d.result.verdict;
+      const vcls = v === 'PROMISING' ? 'PROMISING' : v === 'NO EDGE' ? 'NO' : 'INSUFFICIENT';
+      const tf = d.result.timeframe === 'day' ? 'positional · daily bars' : 'intraday';
+      const entry = d.spec.entry.map(condText).join(' AND ') || '—';
+      const exit = (d.spec.exit || []).map(condText).join(' OR ') || '—';
+      const stop = d.spec.stop_pct ? (d.spec.stop_pct * 100).toFixed(1) + '% stop' : 'no stop';
+
+      out.innerHTML =
+        '<div class="row" style="display:flex;justify-content:space-between;align-items:center">'
+        + '<span class="verdict ' + vcls + '">' + v + '</span>'
+        + '<span class="pill">' + tf + ' · ' + d.symbols_tested + ' symbols</span></div>'
+        + '<p class="explain">' + d.explanation + '</p>'
+        + '<table><thead><tr><th>Period</th><th>Trades</th><th>Net P&amp;L</th><th>Profit factor</th></tr></thead><tbody>'
+        + statsRow('Full history', d.result.full)
+        + statsRow('Train (60%)', d.result.train)
+        + statsRow('Test — unseen (40%)', d.result.test)
+        + '</tbody></table>'
+        + '<div class="rules">Compiled rule &nbsp;·&nbsp; <b>Entry:</b> <code>' + entry + '</code>'
+        + ' &nbsp; <b>Exit:</b> <code>' + exit + '</code> &nbsp; <b>Risk:</b> <code>' + stop + '</code></div>'
+        + '<p class="sub" style="margin-top:12px">The verdict is judged on the <b>unseen test slice</b>, not the '
+        + 'full history — that’s what separates a real edge from curve-fitting. A backtest is never proof; '
+        + 'paper-trade anything promising before risking real money.</p>';
+    }
+
+    btn.onclick = run;
+    document.getElementById('desc').addEventListener('keydown', e => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') run();
+    });
+  </script>
+</body>
+</html>

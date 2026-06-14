@@ -15,6 +15,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from app.capital import get_current_capital
 from app.config import get_settings
@@ -23,6 +24,9 @@ from app.data.instruments import UNIVERSE
 from app.economics import monthly_cost_report
 from app.journal import save_session_day, track_record
 from app.readiness import evaluate as evaluate_readiness
+from app.research.data import load_universe
+from app.research.runner import run_spec
+from app.research.translate import english_to_spec, explain_result
 from app.data.upstox_client import exchange_code_for_token, login_url, persist_token
 from app.strategies.factory import build_strategy, uses_index
 from app.strategies.regime import MarketRegime
@@ -64,6 +68,12 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 def dashboard() -> FileResponse:
     """The self-contained monitoring dashboard (phone-friendly)."""
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/backtester", response_class=HTMLResponse)
+def backtester_page() -> FileResponse:
+    """The AI honest-backtester: plain-English idea -> rigorous backtest -> verdict."""
+    return FileResponse(STATIC_DIR / "backtester.html")
 
 
 class _State:
@@ -236,6 +246,46 @@ def test_trade(symbol: str | None = None) -> dict:
         return {"ok": True, "trade": STATE.session.place_test_trade(symbol)}
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+
+
+# --- AI honest-backtester ---------------------------------------------------
+class BacktestRequest(BaseModel):
+    description: str
+    use_llm: bool = True
+
+
+@app.post("/api/backtest")
+def backtest_idea(req: BacktestRequest) -> dict:
+    """Plain-English strategy -> bounded spec -> rigorous backtest -> honest verdict.
+
+    The whole product in one call: translate the idea, backtest it on cached
+    history with realistic costs and an out-of-sample split, and explain the
+    result without hype.
+    """
+    text = (req.description or "").strip()
+    if not text:
+        raise HTTPException(400, "Describe a strategy in plain English.")
+
+    settings = get_settings()
+    spec = english_to_spec(text, settings=settings, use_llm=req.use_llm)
+    if not spec.entry:
+        raise HTTPException(
+            422, "Couldn't turn that into a testable rule. Try naming an indicator and a "
+                 "condition, e.g. 'buy when the close breaks above the 20-day high'.")
+
+    data = load_universe(settings)
+    if not data:
+        raise HTTPException(
+            503, "No historical data cached yet. Fetch it first: "
+                 "python -m scripts.fetch_history --interval day --days 1095")
+
+    result = run_spec(spec, data, settings=settings)
+    return {
+        "spec": spec.model_dump(),
+        "result": result,
+        "explanation": explain_result(spec, result, settings=settings, use_llm=req.use_llm),
+        "symbols_tested": len(data),
+    }
 
 
 # --- Upstox OAuth -----------------------------------------------------------
